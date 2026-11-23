@@ -70,6 +70,47 @@
       <p class="help">Lost your phone? Enter one of your recovery codes instead.</p>
       <button type="submit">Sign in</button>
     </form>
+    <p class="help"><a class="link-button" href="/reset" id="reset-open">Forgot your password?</a></p>
+  </section>
+  <p class="notice" role="status" data-notice></p>
+</main>
+
+<!-- Forgotten password, or lost phone and recovery codes: whoever runs the server lets the admin back in. -->
+<main class="lone" id="reset" hidden>
+  <p class="mark"><span class="wordmark">mohur<span class="wordmark-stop">.</span></span></p>
+  <section class="card" id="reset-code">
+    <h1>Set a new password</h1>
+    <p class="hint">Whoever runs this server can let you back in. On the server, run this command and enter the code it shows:</p>
+    <pre class="command">sudo mohurd reset-admin</pre>
+    <form id="reset-code-form">
+      <label for="reset-code-input">Reset code</label>
+      <input id="reset-code-input" name="code" autocomplete="one-time-code" spellcheck="false" required>
+      <p class="help">It works once, within an hour. This also helps if you lost your phone and your recovery codes.</p>
+      <button type="submit">Continue</button>
+    </form>
+    <p class="help"><a class="link-button" href="/signin" id="reset-back">Back to sign in</a></p>
+  </section>
+  <section class="card" id="reset-details" hidden>
+    <h1>New password and authenticator</h1>
+    <form id="reset-form">
+      <label for="reset-user">Admin name</label>
+      <input id="reset-user" name="username" autocomplete="username" spellcheck="false" readonly>
+      <label for="reset-password">New password</label>
+      <input id="reset-password" name="password" type="password" autocomplete="new-password" minlength="15" required>
+      <p class="help">At least 15 characters. A few unrelated words work well.</p>
+      <h2 class="step">Authenticator</h2>
+      <p class="help">Scan this with your authenticator app, then enter the six-digit code it shows. The old entry for this server stops working; you can delete it.</p>
+      <div class="qr-box"><svg id="reset-qr" class="qr" role="img" aria-label="Authenticator QR code"></svg><output id="reset-seed" class="seed"></output></div>
+      <label for="reset-totp">Six-digit code</label>
+      <input id="reset-totp" name="totp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required>
+      <button type="submit">Save and sign in</button>
+    </form>
+  </section>
+  <section class="card" id="reset-recovery" hidden>
+    <h1>Save your new recovery codes</h1>
+    <p class="hint">Each code signs you in once if you lose your phone. Your old codes no longer work. Keep these somewhere safe, away from this computer. They are shown only now.</p>
+    <output id="reset-recovery-list" class="codes"></output>
+    <div class="actions"><button type="button" class="secondary" data-copy="reset-recovery-list">Copy</button><button type="button" id="reset-done">I saved them</button></div>
   </section>
   <p class="notice" role="status" data-notice></p>
 </main>

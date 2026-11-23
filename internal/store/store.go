@@ -43,11 +43,12 @@ var (
 
 // Store is the server's database.
 type Store struct {
-	db      *bolt.DB
-	aead    cipher.AEAD
-	macKey  []byte
-	blobDir string
-	now     func() time.Time
+	db       *bolt.DB
+	aead     cipher.AEAD
+	macKey   []byte
+	resetKey []byte
+	blobDir  string
+	now      func() time.Time
 }
 
 // Open opens or creates the database in dir. keyFile holds the 32-byte
@@ -69,6 +70,11 @@ func Open(dir, keyFile string) (*Store, error) {
 		return nil, err
 	}
 	macKey, err := hkdf.Key(sha256.New, key, nil, "mohur/recovery/v1", 32)
+	if err != nil {
+		clear(key)
+		return nil, err
+	}
+	resetKey, err := resetKeyFrom(key)
 	clear(key)
 	if err != nil {
 		return nil, err
@@ -98,7 +104,7 @@ func Open(dir, keyFile string) (*Store, error) {
 		_ = db.Close()
 		return nil, err
 	}
-	return &Store{db: db, aead: aead, macKey: macKey, blobDir: blobDir, now: time.Now}, nil
+	return &Store{db: db, aead: aead, macKey: macKey, resetKey: resetKey, blobDir: blobDir, now: time.Now}, nil
 }
 
 // Close closes the database.

@@ -30,6 +30,9 @@ func main() {
 }
 
 func run() error {
+	if len(os.Args) > 1 && os.Args[1] == "reset-admin" {
+		return resetAdmin(os.Args[2:])
+	}
 	var (
 		dataDir      = flag.String("data", "/var/lib/mohur", "directory for the database and encrypted files")
 		keyFile      = flag.String("instance-key", "/etc/mohur/instance.key", "file holding the 32-byte instance key; created if missing")
@@ -40,6 +43,11 @@ func run() error {
 		extraCA      = flag.String("extra-ca", "", "PEM file of extra certificate authorities to trust for partner servers")
 		allowPrivate = flag.Bool("allow-private-partners", false, "allow partner servers on private or loopback addresses")
 	)
+	flag.Usage = func() {
+		out := flag.CommandLine.Output()
+		fmt.Fprint(out, "Usage: mohurd [options]\n       mohurd reset-admin [-instance-key file]\n\nreset-admin prints a one-time code that lets the admin set a new password\nand authenticator, while the server keeps running.\n\nOptions:\n")
+		flag.PrintDefaults()
+	}
 	flag.Parse()
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
@@ -147,4 +155,29 @@ func (c *certReloader) get() (*tls.Certificate, error) {
 	}
 	c.cert, c.modTime = &cert, info.ModTime()
 	return c.cert, nil
+}
+
+// resetAdmin prints a one-time code that lets the admin set a new password
+// and authenticator from the sign-in page. It reads only the instance key, so
+// the server keeps running.
+func resetAdmin(args []string) error {
+	fs := flag.NewFlagSet("reset-admin", flag.ContinueOnError)
+	keyFile := fs.String("instance-key", "/etc/mohur/instance.key", "the instance key file the server uses")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() != 0 {
+		return errors.New("reset-admin takes no arguments")
+	}
+	code, err := store.ResetCode(*keyFile, time.Now())
+	switch {
+	case errors.Is(err, os.ErrPermission):
+		return fmt.Errorf("cannot read %s: run this with sudo", *keyFile)
+	case errors.Is(err, os.ErrNotExist):
+		return fmt.Errorf("no instance key at %s: give the one the server uses with -instance-key", *keyFile)
+	case err != nil:
+		return err
+	}
+	fmt.Printf("\nOpen this server's sign-in page, choose \"Forgot your password?\" and enter this code:\n\n    %s\n\nIt works once, within an hour. It lets the admin set a new password and authenticator.\n\n", group(code))
+	return nil
 }

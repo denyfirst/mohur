@@ -121,6 +121,14 @@ button:disabled { cursor: default; color: var(--paper); background: var(--ink-fa
 body[data-busy] button { cursor: progress; }
 .link-button { min-height: 32px; margin: 0; padding: 0; color: var(--link); background: none; border: 0; font-weight: 600; font-size: 14px; }
 .link-button:hover:not(:disabled) { background: none; text-decoration: underline; }
+a.link-button { display: inline-flex; align-items: center; text-decoration: none; }
+a.link-button:hover { text-decoration: underline; }
+input[readonly] { color: var(--ink-soft); background: var(--paper-sunk); }
+pre.command {
+  margin: 12px 0 0; padding: 10px 14px; overflow-x: auto;
+  font-family: var(--mono); font-size: 14px; user-select: all;
+  background: var(--paper-sunk); border: 1px solid var(--rule); border-radius: var(--r-s);
+}
 .actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-end; }
 .actions button { margin-top: 24px; }
 

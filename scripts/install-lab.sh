@@ -62,9 +62,16 @@ grep -qx 'User=mohur' "${work}/props" && grep -qx 'NoNewPrivileges=yes' "${work}
   || fail 'the unit is not sandboxed as written'
 systemd-analyze security mohurd.service --no-pager | tail -n 1
 
-echo '--- setup, invite, join and sign-in through the sandboxed service'
+echo '--- an admin reset code: only with sudo, while the service runs'
+if /usr/local/bin/mohurd reset-admin > "${work}/reset.out" 2>&1; then fail 'reset-admin worked without sudo'; fi
+grep -q 'run this with sudo' "${work}/reset.out" || { cat "${work}/reset.out" >&2; fail 'reset-admin without sudo did not say why'; }
+reset="$(sudo /usr/local/bin/mohurd reset-admin | sed -n 's/^ \{4\}\([A-Z2-7-]\{20,\}\)$/\1/p')"
+test -n "${reset}" || fail 'reset-admin showed no code'
+systemctl is-active --quiet mohurd || fail 'reset-admin stopped the service'
+
+echo '--- setup, invite, join, sign-in and reset through the sandboxed service'
 grep -q mohur.ci.test /etc/hosts || echo '127.0.0.1 mohur.ci.test' | sudo tee -a /etc/hosts >/dev/null
-MOHUR_LAB_URL="${url}" MOHUR_LAB_CA="${work}/cert.pem" MOHUR_LAB_CODE="${code}" \
+MOHUR_LAB_URL="${url}" MOHUR_LAB_CA="${work}/cert.pem" MOHUR_LAB_CODE="${code}" MOHUR_LAB_RESET="${reset}" \
   go test -tags=installlab -run '^TestInstalledServer$' -count=1 -v ./internal/server/ > "${work}/flow.out" 2>&1 \
   || { cat "${work}/flow.out" >&2; fail 'the setup flow failed'; }
 grep -q -- '--- PASS: TestInstalledServer' "${work}/flow.out" || { cat "${work}/flow.out" >&2; fail 'the setup flow did not run'; }

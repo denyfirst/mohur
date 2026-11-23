@@ -236,6 +236,88 @@ func (s *Server) signOut(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{})
 }
 
+const badResetCode = "That reset code is not right or has expired. Run sudo mohurd reset-admin on the server for a new one."
+
+// resetSlot keys the new authenticator seed of a reset in progress, apart
+// from setup's.
+func resetSlot(code string) [32]byte { return sha256.Sum256([]byte("reset/" + code)) }
+
+// resetStart checks a code from `mohurd reset-admin` and offers a new
+// authenticator for the admin, whose name it shows.
+func (s *Server) resetStart(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Code string `json:"code"`
+	}
+	if !sameOrigin(r) || !s.allow(r, "reset", 10) || readJSON(r, 4<<10, &in) != nil {
+		fail(w, http.StatusForbidden, "Refused. Wait a minute and try again.")
+		return
+	}
+	code := store.NormalizeCode(in.Code)
+	admin := s.st.AdminName()
+	if admin == "" || !s.st.CheckResetCode(code) {
+		fail(w, http.StatusForbidden, badResetCode)
+		return
+	}
+	label := "Mohur"
+	if o, _, ok := s.org(); ok {
+		label = o.Name
+	}
+	seed := store.NewSeed()
+	s.mu.Lock()
+	s.setupSeed[resetSlot(code)] = seed
+	s.mu.Unlock()
+	writeJSON(w, http.StatusOK, map[string]any{"admin": admin, "seed": seed, "qr": qrRows(store.SeedURI(label, admin, seed))})
+}
+
+// resetFinish sets the new password and authenticator, ends the admin's
+// other sessions and signs this browser in.
+func (s *Server) resetFinish(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Code     string `json:"code"`
+		Username string `json:"username"`
+		Password string `json:"password"`
+		TOTP     string `json:"totp"`
+	}
+	if !sameOrigin(r) || !s.allow(r, "reset", 10) || readJSON(r, 8<<10, &in) != nil {
+		fail(w, http.StatusForbidden, "Refused. Wait a minute and try again.")
+		return
+	}
+	code := store.NormalizeCode(in.Code)
+	if !store.PasswordOK(in.Password) {
+		fail(w, http.StatusBadRequest, "Use a password of at least 15 characters.")
+		return
+	}
+	slot := resetSlot(code)
+	s.mu.Lock()
+	seed := s.setupSeed[slot]
+	s.mu.Unlock()
+	if seed == "" {
+		fail(w, http.StatusForbidden, "Start again with the reset code.")
+		return
+	}
+	user := strings.ToLower(strings.TrimSpace(in.Username))
+	codes, err := s.st.ResetAdmin(store.Reset{Code: code, Username: user, Password: in.Password, Seed: seed, TOTP: strings.TrimSpace(in.TOTP)})
+	switch {
+	case errors.Is(err, store.ErrRefused):
+		fail(w, http.StatusForbidden, "The authenticator code was not accepted. Wait for a new code and try again.")
+		return
+	case err != nil:
+		fail(w, http.StatusForbidden, badResetCode)
+		return
+	}
+	s.mu.Lock()
+	delete(s.setupSeed, slot)
+	for h, a := range s.admins {
+		if a.username == user {
+			delete(s.admins, h)
+		}
+	}
+	s.mu.Unlock()
+	s.log.Info("admin access reset", "admin", user)
+	s.startAdminSession(w, user)
+	writeJSON(w, http.StatusOK, map[string]any{"admin": user, "recovery": codes})
+}
+
 // domainCheck looks at this organization from outside, as a partner would.
 func (s *Server) domainCheck(w http.ResponseWriter, r *http.Request, _ string) {
 	o, _, ok := s.org()

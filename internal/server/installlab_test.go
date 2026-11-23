@@ -22,12 +22,13 @@ import (
 )
 
 // TestInstalledServer drives a mohurd that scripts/install.sh installed under
-// systemd, with all its sandboxing, through setup, sign-in, an invite, a join
-// and an app session. scripts/install-lab.sh runs it with:
-// MOHUR_LAB_URL (https://name:port), MOHUR_LAB_CA (PEM) and MOHUR_LAB_CODE.
+// systemd, with all its sandboxing, through setup, sign-in, an invite, a join,
+// an app session and an admin reset. scripts/install-lab.sh runs it with
+// MOHUR_LAB_URL (https://name:port), MOHUR_LAB_CA (PEM), MOHUR_LAB_CODE and
+// MOHUR_LAB_RESET, a code from `sudo mohurd reset-admin`.
 func TestInstalledServer(t *testing.T) {
-	base, caFile, code := os.Getenv("MOHUR_LAB_URL"), os.Getenv("MOHUR_LAB_CA"), os.Getenv("MOHUR_LAB_CODE")
-	if base == "" || caFile == "" || code == "" {
+	base, caFile, code, resetCode := os.Getenv("MOHUR_LAB_URL"), os.Getenv("MOHUR_LAB_CA"), os.Getenv("MOHUR_LAB_CODE"), os.Getenv("MOHUR_LAB_RESET")
+	if base == "" || caFile == "" || code == "" || resetCode == "" {
 		t.Skip("run by scripts/install-lab.sh")
 	}
 	pem, err := os.ReadFile(caFile)
@@ -99,4 +100,16 @@ func TestInstalledServer(t *testing.T) {
 	call("POST", "/api/v1/session/challenge", map[string]any{"address": joined.Cert.Address, "device": joined.Cert.Device}, 200, &ch)
 	sig := proto.Sign(priv, proto.ContextSession, "ci.test", joined.Cert.Address, strconv.Itoa(int(joined.Cert.Device)), ch.Nonce)
 	call("POST", "/api/v1/session", map[string]any{"address": joined.Cert.Address, "device": joined.Cert.Device, "nonce": ch.Nonce, "sig": sig}, 200, nil)
+
+	// The operator's code from `sudo mohurd reset-admin` works on the
+	// sandboxed service, which kept running, and only once.
+	var reset struct {
+		Admin string `json:"admin"`
+		Seed  string `json:"seed"`
+	}
+	call("POST", "/admin/api/reset/start", map[string]any{"code": resetCode}, 200, &reset)
+	call("POST", "/admin/api/reset/finish", map[string]any{"code": resetCode, "username": reset.Admin, "password": "install lab new password",
+		"totp": store.TOTP(reset.Seed, time.Now())}, 200, nil)
+	call("POST", "/admin/api/reset/start", map[string]any{"code": resetCode}, 403, nil)
+	call("GET", "/admin/api/people", nil, 200, nil)
 }

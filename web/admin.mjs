@@ -4,6 +4,7 @@
 const $ = (id) => document.getElementById(id);
 let state = {};
 let setupCode = '';
+let resetCode = '';
 
 async function api(path, body) {
   const init = { method: body === undefined ? 'GET' : 'POST', headers: { 'X-Mohur': '1' }, credentials: 'same-origin' };
@@ -70,7 +71,7 @@ function drawQR(svg, rows) {
 const pages = { '/': 'overview', '/people': 'people', '/partners': 'partners', '/domain': 'domain' };
 
 function showOnly(id) {
-  for (const v of ['setup', 'signin', 'workspace']) $(v).hidden = v !== id;
+  for (const v of ['setup', 'signin', 'reset', 'workspace']) $(v).hidden = v !== id;
   delete document.body.dataset.loading;
 }
 
@@ -82,6 +83,11 @@ async function load() {
     return;
   }
   if (!state.admin) {
+    if (location.pathname === '/reset') {
+      showOnly('reset');
+      if (!$('reset-code').hidden) $('reset-code-input').focus();
+      return;
+    }
     showOnly('signin');
     if (location.pathname !== '/signin') history.replaceState(null, '', '/signin');
     $('signin-user').focus();
@@ -389,7 +395,7 @@ function wire() {
     }
     if (ev.target.closest('[data-close]')) ev.target.closest('dialog').close();
   });
-  window.addEventListener('popstate', route);
+  window.addEventListener('popstate', () => (state.admin ? route() : load()));
 
   document.querySelector('.menu-toggle').addEventListener('click', (ev) => {
     const rail = document.querySelector('.rail');
@@ -441,6 +447,52 @@ function wire() {
       notice($('signin'), e.message, 'bad');
       $('signin-code').value = '';
     }
+  });
+  for (const [id, path] of [['reset-open', '/reset'], ['reset-back', '/signin']]) {
+    $(id).addEventListener('click', (ev) => {
+      ev.preventDefault();
+      notice($('signin'), '');
+      notice($('reset'), '');
+      history.pushState(null, '', path);
+      load();
+    });
+  }
+  $('reset-code-form').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    try {
+      resetCode = $('reset-code-input').value.trim();
+      const res = await api('reset/start', { code: resetCode });
+      $('reset-user').value = res.admin;
+      drawQR($('reset-qr'), res.qr);
+      $('reset-seed').textContent = res.seed.match(/.{1,4}/g).join(' ');
+      $('reset-code').hidden = true;
+      $('reset-details').hidden = false;
+      notice($('reset'), '');
+      $('reset-password').focus();
+    } catch (e) { notice($('reset'), e.message, 'bad'); }
+  });
+  $('reset-form').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const f = Object.fromEntries(new FormData(ev.target));
+    try {
+      const res = await api('reset/finish', { ...f, code: resetCode });
+      $('reset-details').hidden = true;
+      $('reset-recovery').hidden = false;
+      $('reset-recovery-list').textContent = res.recovery.map((c) => c.match(/.{1,4}/g).join('-')).join('\n');
+      notice($('reset'), '');
+    } catch (e) {
+      notice($('reset'), e.message, 'bad');
+      $('reset-totp').value = '';
+    }
+  });
+  $('reset-done').addEventListener('click', () => {
+    resetCode = '';
+    for (const f of ['reset-code-form', 'reset-form']) $(f).reset();
+    $('reset-recovery-list').textContent = '';
+    $('reset-recovery').hidden = true;
+    $('reset-code').hidden = false;
+    history.replaceState(null, '', '/');
+    load();
   });
   $('signout').addEventListener('click', async () => {
     await api('signout', {}).catch(() => {});

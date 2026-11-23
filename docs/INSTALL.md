@@ -57,6 +57,21 @@ sudo sh install.sh --binary=./mohurd
 
 Data, keys and settings stay as they are.
 
+## If the admin cannot sign in
+
+A forgotten password, or a lost phone together with the recovery codes: on the
+server, run
+
+```sh
+sudo mohurd reset-admin
+```
+
+It prints a one-time code and the server keeps running. On the sign-in page,
+choose **Forgot your password?**, enter the code, then set a new password and
+scan a new authenticator. The old password, authenticator and recovery codes
+stop working, and the admin's other sessions end. The code works once, within
+an hour.
+
 ## Back up
 
 Copy `/var/lib/mohur` and, separately, `/etc/mohur/instance.key`. The

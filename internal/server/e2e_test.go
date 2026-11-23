@@ -42,13 +42,14 @@ type lab struct {
 }
 
 type org struct {
-	lab    *lab
-	domain string
-	server string // host:port
-	srv    *Server
-	st     *store.Store
-	admin  *http.Client
-	key    ed25519.PublicKey
+	lab     *lab
+	domain  string
+	server  string // host:port
+	srv     *Server
+	st      *store.Store
+	admin   *http.Client
+	key     ed25519.PublicKey
+	keyFile string // the instance key, for reset codes
 }
 
 func newLab(t *testing.T) *lab {
@@ -121,7 +122,7 @@ func (l *lab) start(domain string) *org {
 	t.Cleanup(func() { _ = hs.Close() })
 
 	jar, _ := cookiejar.New(nil)
-	o := &org{lab: l, domain: domain, server: host + ":" + port, srv: srv, st: st, admin: l.client(jar)}
+	o := &org{lab: l, domain: domain, server: host + ":" + port, srv: srv, st: st, admin: l.client(jar), keyFile: dir + "/instance.key"}
 	code, err := st.NewSetupCode()
 	if err != nil {
 		t.Fatal(err)
