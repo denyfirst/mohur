@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="color-scheme" content="light dark">
+<title>Mohur</title>
+<link rel="stylesheet" href="app.css">
+<script type="module" src="app.mjs"></script>
+</head>
+<body data-loading>
+
+<main class="join" id="join" hidden>
+  <div class="join-card">
+    <p class="mark"><span class="wordmark">mohur<span class="stop">.</span></span></p>
+    <h1>Join your organization</h1>
+    <p class="hint">Paste the invite your admin sent you. It looks like <span class="mono">company.com/ABCD-EFGH-…</span></p>
+    <form id="join-form">
+      <label for="join-invite">Invite</label>
+      <input id="join-invite" autocomplete="off" spellcheck="false" required>
+      <div class="verified" id="join-found" hidden>
+        <svg class="seal" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 14.2 4l2.7-.2 1.1 2.4 2.4 1.1-.2 2.7L21.5 12 20 14.2l.2 2.7-2.4 1.1-1.1 2.4-2.7-.2L12 21.5 9.8 20l-2.7.2-1.1-2.4-2.4-1.1.2-2.7L2.5 12 4 9.8l-.2-2.7 2.4-1.1 1.1-2.4 2.7.2z"/><path d="m8.5 12.2 2.3 2.3 4.7-4.9"/></svg>
+        <div><strong id="join-org"></strong><span class="sub" id="join-domain"></span><span class="sub">Verified by its domain record and certificate.</span></div>
+      </div>
+      <p class="notice" id="join-notice" role="status"></p>
+      <button type="submit" id="join-submit">Check invite</button>
+    </form>
+    <p class="fine">Your keys are made on this computer and never leave it.</p>
+  </div>
+</main>
+
+<div class="app" id="app" hidden>
+  <aside class="side">
+    <header class="me">
+      <span class="wordmark small">mohur<span class="stop">.</span></span>
+      <div class="me-who"><strong id="me-name"></strong><span class="sub" id="me-org"></span></div>
+    </header>
+    <label class="search"><span class="visually-hidden">Search people</span><input id="search" type="search" placeholder="Search people" autocomplete="off"></label>
+    <nav class="people" id="people" aria-label="People"></nav>
+    <footer class="side-foot">
+      <span class="status" id="status"><span class="dot"></span><span id="status-text"></span></span>
+      <span class="fine">Encrypted end to end. Servers cannot read your messages.</span>
+    </footer>
+  </aside>
+
+  <section class="conv" id="conv">
+    <div class="conv-empty" id="conv-empty">
+      <svg class="seal big" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 14.2 4l2.7-.2 1.1 2.4 2.4 1.1-.2 2.7L21.5 12 20 14.2l.2 2.7-2.4 1.1-1.1 2.4-2.7-.2L12 21.5 9.8 20l-2.7.2-1.1-2.4-2.4-1.1.2-2.7L2.5 12 4 9.8l-.2-2.7 2.4-1.1 1.1-2.4 2.7.2z"/><path d="m8.5 12.2 2.3 2.3 4.7-4.9"/></svg>
+      <p><strong>Choose someone to write to.</strong></p>
+      <p class="sub">Everyone in the list is verified by their organization.</p>
+    </div>
+    <header class="conv-head" id="conv-head" hidden>
+      <span class="avatar" id="conv-avatar" aria-hidden="true"></span>
+      <div class="conv-who"><strong id="conv-name"></strong><span class="sub" id="conv-addr"></span></div>
+      <span class="chip" id="conv-chip"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 12.5 3 3 7-7"/></svg><span id="conv-chip-text"></span></span>
+    </header>
+    <ol class="messages" id="messages" aria-live="polite" hidden></ol>
+    <form class="composer" id="composer" hidden>
+      <button type="button" class="icon" id="attach" title="Send a file" aria-label="Send a file"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m20 11.5-8.2 8.2a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8"/></svg></button>
+      <label class="visually-hidden" for="text">Message</label>
+      <textarea id="text" rows="1" placeholder="Write a message" maxlength="20000"></textarea>
+      <button type="submit" class="send" id="send" aria-label="Send"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12 20 4l-6 16-2.5-6.5z"/><path d="m11.5 13.5 3-3"/></svg></button>
+    </form>
+  </section>
+</div>
+
+</body>
+</html>

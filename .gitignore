@@ -1,0 +1,33 @@
+# Local diagnostics, isolated qualification work, caches and outputs
+.work/
+node_modules/
+target/
+dist/
+coverage/
+*.log
+*.dmp
+*.core
+
+# Secrets, local configuration and persisted application data
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+data/
+secrets/
+backups/
+
+# Workstation files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

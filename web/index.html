@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Mohur</title>
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/mohur.css">
+<script type="module" src="/assets/admin.mjs"></script>
+</head>
+<body data-loading>
+
+<!-- First start: one card in the middle of the page. -->
+<main class="lone" id="setup" hidden>
+  <p class="mark"><span class="wordmark">mohur<span class="wordmark-stop">.</span></span></p>
+  <section class="card" id="setup-code">
+    <h1>Set up Mohur</h1>
+    <p class="hint">Enter the setup code. The server printed it when it started for the first time.</p>
+    <form id="setup-code-form">
+      <label for="setup-code-input">Setup code</label>
+      <input id="setup-code-input" name="code" autocomplete="one-time-code" spellcheck="false" required>
+      <button type="submit">Continue</button>
+    </form>
+  </section>
+  <section class="card" id="setup-details" hidden>
+    <h1>Your organization</h1>
+    <form id="setup-form">
+      <label for="setup-org">Organization name</label>
+      <input id="setup-org" name="orgName" autocomplete="organization" required>
+      <label for="setup-domain">Domain</label>
+      <input id="setup-domain" name="domain" placeholder="example.com" spellcheck="false" required>
+      <label for="setup-server">This server's address</label>
+      <input id="setup-server" name="server" placeholder="mohur.example.com" spellcheck="false" required>
+      <p class="help">The domain itself or a name under it, the one people open this page with.</p>
+      <h2 class="step">Your admin account</h2>
+      <label for="setup-user">Admin name</label>
+      <input id="setup-user" name="username" autocomplete="username" spellcheck="false" required>
+      <label for="setup-password">Password</label>
+      <input id="setup-password" name="password" type="password" autocomplete="new-password" minlength="15" required>
+      <p class="help">At least 15 characters. A few unrelated words work well.</p>
+      <h2 class="step">Authenticator</h2>
+      <p class="help">Scan this with an authenticator app, then enter the six-digit code it shows.</p>
+      <div class="qr-box"><svg id="setup-qr" class="qr" role="img" aria-label="Authenticator QR code"></svg><output id="setup-seed" class="seed"></output></div>
+      <label for="setup-totp">Six-digit code</label>
+      <input id="setup-totp" name="totp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required>
+      <button type="submit">Finish setup</button>
+    </form>
+  </section>
+  <section class="card" id="setup-recovery" hidden>
+    <h1>Save your recovery codes</h1>
+    <p class="hint">Each code signs you in once if you lose your phone. Keep them somewhere safe, away from this computer. They are shown only now.</p>
+    <output id="recovery-list" class="codes"></output>
+    <div class="actions"><button type="button" class="secondary" data-copy="recovery-list">Copy</button><button type="button" id="recovery-done">I saved them</button></div>
+  </section>
+  <p class="notice" role="status" data-notice></p>
+</main>
+
+<main class="lone" id="signin" hidden>
+  <p class="mark"><span class="wordmark">mohur<span class="wordmark-stop">.</span></span></p>
+  <section class="card">
+    <h1>Sign in</h1>
+    <form id="signin-form">
+      <label for="signin-user">Admin name</label>
+      <input id="signin-user" name="username" autocomplete="username" spellcheck="false" required>
+      <label for="signin-password">Password</label>
+      <input id="signin-password" name="password" type="password" autocomplete="current-password" required>
+      <label for="signin-code">Code from your authenticator</label>
+      <input id="signin-code" name="code" autocomplete="one-time-code" spellcheck="false" required>
+      <p class="help">Lost your phone? Enter one of your recovery codes instead.</p>
+      <button type="submit">Sign in</button>
+    </form>
+  </section>
+  <p class="notice" role="status" data-notice></p>
+</main>
+
+<!-- Signed in: the rail and one page beside it. -->
+<div class="workspace" id="workspace" hidden>
+  <nav class="rail" aria-label="Pages">
+    <div class="rail-top">
+      <a class="wordmark" href="/" data-link>mohur<span class="wordmark-stop">.</span></a>
+      <button type="button" class="menu-toggle secondary" aria-expanded="false" aria-controls="rail-menu">Menu</button>
+    </div>
+    <div class="rail-menu" id="rail-menu">
+      <p class="org-name" id="rail-org"></p>
+      <a class="rail-item" href="/" data-link data-page="overview"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5h-5v5H5a1 1 0 0 1-1-1z"/></svg>Overview</a>
+      <a class="rail-item" href="/people" data-link data-page="people"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8.5" r="3.5"/><path d="M2.5 19.5c.8-3.4 3.4-5.5 6.5-5.5s5.7 2.1 6.5 5.5"/><path d="M15.5 5.3a3.5 3.5 0 0 1 0 6.4M18 14.4c1.8.8 3 2.6 3.5 5.1"/></svg>People</a>
+      <a class="rail-item" href="/partners" data-link data-page="partners"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="7" width="8" height="10" rx="2"/><rect x="13.5" y="7" width="8" height="10" rx="2"/><path d="M10.5 12h3"/></svg>Partners<span class="count" id="rail-requests" hidden></span></a>
+      <a class="rail-item" href="/domain" data-link data-page="domain"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg>Domain<span class="dot-warn" id="rail-domain-warn" hidden></span></a>
+      <div class="rail-foot">
+        <p class="who"><span id="rail-admin"></span></p>
+        <button type="button" class="link-button" id="signout">Sign out</button>
+        <p class="colophon">by <span class="org">denyfirst<span class="brand-stop">.</span></span></p>
+      </div>
+    </div>
+  </nav>
+
+  <main class="page" id="page-overview" hidden>
+    <header class="page-head"><p class="eyebrow">Overview</p><h1 id="ov-name"></h1><p class="hint" id="ov-domain"></p></header>
+    <section class="steps" aria-label="Getting started">
+      <a class="step-card" href="/domain" data-link id="ov-step-domain"><span class="step-n">1</span><span><strong>Publish your domain record</strong><span class="sub">Partners find and verify you with it.</span></span><span class="pill" data-pill></span></a>
+      <a class="step-card" href="/people" data-link id="ov-step-people"><span class="step-n">2</span><span><strong>Invite your people</strong><span class="sub">They join with the Mohur app.</span></span><span class="pill" data-pill></span></a>
+      <a class="step-card" href="/partners" data-link id="ov-step-partners"><span class="step-n">3</span><span><strong>Connect a partner</strong><span class="sub">Enter their domain. They accept.</span></span><span class="pill" data-pill></span></a>
+    </section>
+    <section class="facts">
+      <div class="fact"><p class="eyebrow">People</p><p class="big" id="ov-people">0</p><p class="sub" id="ov-people-sub"></p></div>
+      <div class="fact"><p class="eyebrow">Partners</p><p class="big" id="ov-partners">0</p><p class="sub" id="ov-partners-sub"></p></div>
+      <div class="fact"><p class="eyebrow">Server</p><p class="mono" id="ov-server"></p><p class="sub">Messages pass through it encrypted. It cannot read them.</p></div>
+    </section>
+    <p class="notice" role="status" data-notice></p>
+  </main>
+
+  <main class="page" id="page-people" hidden>
+    <header class="page-head with-action"><div><p class="eyebrow">People</p><h1>People</h1><p class="hint">Everyone here can write to everyone in your partner organizations.</p></div><button type="button" id="invite-open">Invite someone</button></header>
+    <ul class="rows" id="people-list"></ul>
+    <p class="empty" id="people-empty" hidden>No one yet. Invite the first person.</p>
+    <p class="notice" role="status" data-notice></p>
+  </main>
+
+  <main class="page" id="page-partners" hidden>
+    <header class="page-head with-action"><div><p class="eyebrow">Partners</p><h1>Partners</h1><p class="hint">Organizations your people can write to. Each one is verified by its domain.</p></div><button type="button" id="connect-open">Connect a partner</button></header>
+    <ul class="rows" id="partner-list"></ul>
+    <p class="empty" id="partner-empty" hidden>No partners yet. Connect one by its domain.</p>
+    <p class="notice" role="status" data-notice></p>
+  </main>
+
+  <main class="page" id="page-domain" hidden>
+    <header class="page-head"><p class="eyebrow">Domain</p><h1 id="dom-title"></h1><p class="hint">Add this one record where your domain's DNS is managed. It proves the domain is yours and tells partners how to reach this server.</p></header>
+    <section class="card wide">
+      <dl class="record">
+        <dt>Type</dt><dd class="mono">TXT</dd>
+        <dt>Name</dt><dd><output id="dom-name"></output><button type="button" class="secondary small" data-copy="dom-name">Copy</button></dd>
+        <dt>Value</dt><dd><output id="dom-value"></output><button type="button" class="secondary small" data-copy="dom-value">Copy</button></dd>
+      </dl>
+      <div class="status-line"><span class="pill" id="dom-pill"></span><span id="dom-status"></span></div>
+      <button type="button" id="dom-check">Check</button>
+    </section>
+    <p class="notice" role="status" data-notice></p>
+  </main>
+</div>
+
+<dialog id="invite-dialog" aria-labelledby="invite-title">
+  <form id="invite-form" method="dialog">
+    <h2 id="invite-title">Invite someone</h2>
+    <label for="invite-name">Full name</label>
+    <input id="invite-name" name="name" autocomplete="off" required>
+    <label for="invite-user">User name</label>
+    <div class="suffix-field"><input id="invite-user" name="username" spellcheck="false" autocomplete="off" required><span class="suffix" id="invite-domain"></span></div>
+    <p class="notice" role="status" data-dialog-notice></p>
+    <div class="actions"><button type="button" class="secondary" data-close>Cancel</button><button type="submit">Make invite</button></div>
+  </form>
+  <div id="invite-made" hidden>
+    <h2>Send this invite</h2>
+    <p class="hint" id="invite-made-hint"></p>
+    <output id="invite-code" class="invite"></output>
+    <div class="actions"><button type="button" class="secondary" data-copy="invite-code">Copy</button><button type="button" data-close>Done</button></div>
+  </div>
+</dialog>
+
+<dialog id="connect-dialog" aria-labelledby="connect-title">
+  <form id="connect-form" method="dialog">
+    <h2 id="connect-title">Connect a partner</h2>
+    <label for="connect-domain">Their domain</label>
+    <input id="connect-domain" name="domain" placeholder="partner.com" spellcheck="false" autocomplete="off" required>
+    <div class="verified" id="connect-found" hidden>
+      <svg class="seal" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 14.2 4l2.7-.2 1.1 2.4 2.4 1.1-.2 2.7L21.5 12 20 14.2l.2 2.7-2.4 1.1-1.1 2.4-2.7-.2L12 21.5 9.8 20l-2.7.2-1.1-2.4-2.4-1.1.2-2.7L2.5 12 4 9.8l-.2-2.7 2.4-1.1 1.1-2.4 2.7.2z"/><path d="m8.5 12.2 2.3 2.3 4.7-4.9"/></svg>
+      <div><strong id="connect-name"></strong><span class="sub" id="connect-where"></span><span class="sub">Verified by its domain record and certificate.</span></div>
+    </div>
+    <p class="notice" role="status" data-dialog-notice></p>
+    <div class="actions"><button type="button" class="secondary" data-close>Cancel</button><button type="submit" id="connect-submit">Check</button></div>
+  </form>
+</dialog>
+
+<dialog id="confirm-dialog" aria-labelledby="confirm-title">
+  <form method="dialog">
+    <h2 id="confirm-title"></h2>
+    <p class="hint" id="confirm-text"></p>
+    <div class="actions"><button type="button" class="secondary" data-close>Cancel</button><button type="submit" class="danger" id="confirm-yes"></button></div>
+  </form>
+</dialog>
+
+</body>
+</html>
