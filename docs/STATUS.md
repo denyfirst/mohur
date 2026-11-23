@@ -7,7 +7,9 @@
 - **Server (`mohurd`)**: first-run setup with a one-time code, admin sign-in
   with password and authenticator code, the domain record and its **Check**,
   people and one-time invites, partners by domain (connect, accept, remove,
-  accept a changed key), the app API and signed federation between servers.
+  accept a changed key), per-partner choice of who may write (everyone or
+  chosen people, enforced by the server), the app API and signed federation
+  between servers. Apps hear of changes to people and partners at once.
 - **Desktop app**: join with an invite after verifying the organization, a
   contact list of colleagues and partners, one-to-one messages with delivery
   receipts, files up to 100 MB, an encrypted local vault protected by the
@@ -18,14 +20,23 @@
   partner's domain, a DNS-only key change, a rebuilt partner, records that do
   not agree, private addresses, untrusted certificates, reused invites, a
   removed person, a wrong device key, cross-site admin calls and a partner's
-  request that is accepted after its key changed. The app's end-to-end test
+  request that is accepted after its key changed. Partner access is tested
+  end to end: a person who was not chosen cannot list, fetch keys of, send to
+  or upload for the partner; the partner sees only chosen people and its
+  server's direct attempts are refused; bad and cross-site access changes are
+  refused; a removed person's access is not inherited by a new one with the
+  same user name; a waiting app is woken by a new partner, and a partner's new
+  person reaches another organization's app without the one-minute wait.
+  Tests use `*.e2e.test` names, so lab entries in a hosts file cannot collide.
+  The app's end-to-end test
   runs two real servers and two engines with libsignal: joining, contacts,
   messages and receipts, a 3 MB file, a restart, the vault on disk, and a
   certificate from the wrong organization; further tests check the
   organization check, invite parsing and that sessions are post-quantum.
 - **Sabotage**: each of those checks was switched off in turn and a test
   failed every time, except the sender-domain check on delivery, which the
-  device-certificate check already covers.
+  device-certificate check already covers. The 17 partner-access and
+  change-notice checks were switched off the same way; each was caught.
 
 ## Not yet
 

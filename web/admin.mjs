@@ -147,7 +147,19 @@ function requests(prt) {
   $('rail-requests').textContent = n;
 }
 
+// writesWith says, for one person, whom they can write to.
+function writesWith(p) {
+  return p.partners && p.partners.length ? 'Writes with ' + listWords(['colleagues', ...p.partners]) : 'Writes with colleagues only';
+}
+
+function listWords(items) {
+  if (items.length <= 1) return items.join('');
+  if (items.length > 4) return items.slice(0, 3).join(', ') + ' and ' + (items.length - 3) + ' more';
+  return items.slice(0, -1).join(', ') + ' and ' + items[items.length - 1];
+}
+
 async function people() {
+  $('people-title').textContent = 'People in ' + state.org.name;
   const list = await api('people');
   const ul = $('people-list');
   ul.replaceChildren();
@@ -166,7 +178,7 @@ async function people() {
     side.append(el('button', { type: 'button', class: 'secondary small', onclick: () => removePerson(p) }, 'Remove'));
     const sub = p.state === 'active' ? `${p.address} · ${p.device} · joined ${when(p.joined)}` : `${p.address} · invite works until ${when(p.inviteExpires)}`;
     ul.append(el('li', { class: 'row' }, el('span', { class: 'avatar', 'aria-hidden': 'true' }, initials),
-      el('div', { class: 'row-main' }, el('strong', {}, p.name), el('span', { class: 'sub' }, sub)), side));
+      el('div', { class: 'row-main' }, el('strong', {}, p.name), el('span', { class: 'sub' }, sub), el('span', { class: 'sub' }, writesWith(p))), side));
   }
 }
 
@@ -177,6 +189,7 @@ function openInvite(person) {
   $('invite-form').reset();
   notice(d, '');
   $('invite-domain').textContent = '@' + state.org.domain;
+  $('invite-title').textContent = 'Invite someone to ' + state.org.name;
   if (person) {
     $('invite-name').value = person.name;
     $('invite-user').value = person.username;
@@ -188,7 +201,7 @@ function openInvite(person) {
 function showInvite(name, res) {
   $('invite-form').hidden = true;
   $('invite-made').hidden = false;
-  $('invite-made-hint').textContent = `Send this to ${name} in any way you like. They install the Mohur app and paste it. It works once, until ${when(res.expires)}.`;
+  $('invite-made-hint').textContent = `Send this to ${name} in any way you like. ${name.split(/\s+/)[0]} opens Mohur on their own computer and pastes it there. You do not need to approve anything. It works once, until ${when(res.expires)}.`;
   $('invite-code').textContent = res.invite;
 }
 
@@ -218,8 +231,21 @@ const stateWords = {
   'key-changed': ['Key changed', 'bad'],
 };
 
+function theirsWords(p) {
+  if (p.state !== 'connected' || p.theirs === undefined) return '';
+  if (p.theirs === 0) return ' · you see none of their people yet';
+  return ` · you see ${p.theirs} of their people`;
+}
+
+function accessWords(p, names) {
+  if (!p.chosen) return 'Everyone at ' + state.org.name;
+  if (!p.people.length) return 'No one yet';
+  return listWords(p.people.map((u) => names[u] || u));
+}
+
 async function partners() {
-  const list = await api('partners');
+  const [list, ppl] = await Promise.all([api('partners'), api('people')]);
+  const names = Object.fromEntries(ppl.map((x) => [x.username, x.name]));
   requests(list);
   const ul = $('partner-list');
   ul.replaceChildren();
@@ -241,12 +267,14 @@ async function partners() {
     } else {
       side.append(el('button', { type: 'button', class: 'secondary small', onclick: () => removePartner(p, p.state === 'outgoing' ? 'Cancel request' : 'Disconnect') }, p.state === 'outgoing' ? 'Cancel' : 'Disconnect'));
     }
-    const sub = p.state === 'incoming' ? `${p.domain} · verified by its domain · asked ${when(p.updated)}` : `${p.domain} · since ${when(p.created)}`;
+    const sub = p.state === 'incoming' ? `${p.domain} · verified by its domain · asked ${when(p.updated)}` : `${p.domain}${theirsWords(p)} · since ${when(p.created)}`;
+    const access = p.state === 'incoming' ? null : el('span', { class: 'access-line' }, 'Who can write:', el('strong', {}, accessWords(p, names)),
+      el('button', { type: 'button', class: 'link-button', onclick: () => openAccess(p, ppl) }, 'Change'));
     const details = p.securityCode ? el('details', {}, el('summary', {}, 'Security code'),
       el('p', { class: 'help' }, 'Both admins see the same code. You do not need to compare it, but you can, on a call, for extra certainty.'),
       el('p', { class: 'code-groups' }, p.securityCode)) : null;
     li.append(el('span', { class: 'avatar', 'aria-hidden': 'true' }, p.name.slice(0, 1).toUpperCase()),
-      el('div', { class: 'row-main' }, el('strong', {}, p.name), el('span', { class: 'sub' }, sub)), side);
+      el('div', { class: 'row-main' }, el('strong', {}, p.name), el('span', { class: 'sub' }, sub), access), side);
     if (details) li.append(details);
     ul.append(li);
   }
@@ -255,7 +283,7 @@ async function partners() {
 async function accept(p) {
   try {
     await api('partners/accept', { domain: p.domain });
-    notice($('page-partners'), `Connected with ${p.name}. Your people can now write to theirs.`);
+    notice($('page-partners'), `Connected with ${p.name}. Everyone at ${state.org.name} can now write to the people ${p.name} chooses. To choose who on your side, press Change.`);
     await partners();
   } catch (e) { notice($('page-partners'), e.message, 'bad'); }
 }
@@ -276,6 +304,32 @@ async function removePartner(p, verb) {
     await api('partners/remove', { domain: p.domain });
     await partners();
   } catch (e) { notice($('page-partners'), e.message, 'bad'); }
+}
+
+let accessFor = null;
+function openAccess(p, ppl) {
+  accessFor = p;
+  const d = $('access-dialog');
+  $('access-title').textContent = `Who at ${state.org.name} can write with ${p.name}?`;
+  $('access-everyone-sub').textContent = `Everyone at ${state.org.name}, including people you invite later.`;
+  const ul = $('access-people');
+  ul.replaceChildren();
+  for (const x of ppl) {
+    const box = el('input', { type: 'checkbox', name: 'people', value: x.username });
+    box.checked = p.chosen && p.people.includes(x.username);
+    ul.append(el('li', {}, el('label', {}, box, el('span', {}, x.name), el('span', { class: 'sub' }, x.address))));
+  }
+  if (!ppl.length) ul.append(el('li', { class: 'sub' }, 'No one here yet. Invite people on the People page.'));
+  $('access-form').elements.who.value = p.chosen ? 'chosen' : 'everyone';
+  syncAccess();
+  notice(d, '');
+  d.showModal();
+}
+
+function syncAccess() {
+  const chosen = $('access-form').elements.who.value === 'chosen';
+  for (const b of $('access-people').querySelectorAll('input')) b.disabled = !chosen;
+  $('access-people').setAttribute('aria-disabled', String(!chosen));
 }
 
 let found = null;
@@ -410,6 +464,21 @@ function wire() {
       delete $('invite-user').dataset.touched;
       await people();
     } catch (e) { notice($('invite-dialog'), e.message, 'bad'); }
+  });
+
+  $('access-form').addEventListener('change', syncAccess);
+  $('access-form').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const chosen = ev.target.elements.who.value === 'chosen';
+    const picked = [...$('access-people').querySelectorAll('input:checked')].map((b) => b.value);
+    try {
+      await api('partners/access', { domain: accessFor.domain, chosen, people: chosen ? picked : [] });
+      $('access-dialog').close();
+      const org = state.org.name;
+      notice($('page-partners'), !chosen ? `Saved. Everyone at ${org} can write with ${accessFor.name}.`
+        : picked.length ? `Saved. Only the people you chose can write with ${accessFor.name}.` : `Saved. No one at ${org} can write with ${accessFor.name} now.`);
+      await partners();
+    } catch (e) { notice($('access-dialog'), e.message, 'bad'); }
   });
 
   $('connect-open').addEventListener('click', openConnect);

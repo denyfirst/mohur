@@ -2,6 +2,7 @@ package store
 
 import (
 	"encoding/json"
+	"slices"
 	"time"
 
 	"github.com/denyfirst/mohur/internal/proto"
@@ -33,6 +34,78 @@ type Connection struct {
 	NewName   string `json:"newName,omitempty"`
 	NewServer string `json:"newServer,omitempty"`
 	Checked   int64  `json:"checked"`
+	// Chosen limits who here may write with this partner to the usernames in
+	// People. Without it, everyone here may. Each side decides only for its
+	// own people; the partner never sees this list, only its result.
+	Chosen bool     `json:"chosen,omitempty"`
+	People []string `json:"people,omitempty"`
+}
+
+// Allows reports whether the person here with this username may write with
+// this partner and be written to by its people.
+func (c Connection) Allows(username string) bool {
+	return !c.Chosen || slices.Contains(c.People, username)
+}
+
+// MaxChosen bounds the people chosen for one partner.
+const MaxChosen = 10000
+
+// SetAccess sets who here may write with a partner: everyone, or only the
+// chosen people, who must be people of this organization.
+func (s *Store) SetAccess(domain string, chosen bool, people []string) (Connection, error) {
+	var c Connection
+	err := s.db.Update(func(tx *bolt.Tx) error {
+		var err error
+		if c, err = get[Connection](tx, bucketConnections, domain); err != nil {
+			return err
+		}
+		var list []string
+		if chosen {
+			if len(people) > MaxChosen {
+				return ErrRefused
+			}
+			list = []string{}
+			for _, u := range people {
+				if tx.Bucket(bucketPeople).Get([]byte(u)) == nil {
+					return ErrRefused
+				}
+				if !slices.Contains(list, u) {
+					list = append(list, u)
+				}
+			}
+			slices.Sort(list)
+		}
+		c.Chosen, c.People, c.Updated = chosen, list, s.now().Unix()
+		return put(tx, bucketConnections, domain, c)
+	})
+	return c, err
+}
+
+// forgetAccess takes a removed person off every partner's chosen list, so a
+// new person who later gets the same username does not inherit it.
+func forgetAccess(tx *bolt.Tx, username string) error {
+	b := tx.Bucket(bucketConnections)
+	var changed []Connection
+	err := b.ForEach(func(_, v []byte) error {
+		var c Connection
+		if err := json.Unmarshal(v, &c); err != nil {
+			return err
+		}
+		if i := slices.Index(c.People, username); i >= 0 {
+			c.People = slices.Delete(c.People, i, i+1)
+			changed = append(changed, c)
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	for _, c := range changed {
+		if err := put(tx, bucketConnections, c.Domain, c); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // MaxIncoming bounds unanswered incoming requests, so a stranger cannot fill
@@ -240,4 +313,11 @@ func (s *Store) Directory(domain string) ([]proto.Person, time.Time, error) {
 		return err
 	})
 	return d.People, time.Unix(d.Fetched, 0), err
+}
+
+// DropDirectory forgets a partner's cached people, so they are read again.
+func (s *Store) DropDirectory(domain string) error {
+	return s.db.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket(bucketDirectory).Delete([]byte(domain))
+	})
 }

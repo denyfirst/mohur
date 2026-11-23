@@ -113,6 +113,8 @@ func (s *Server) join(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusForbidden, "That invite has expired or was already used. Ask your admin for a new one.")
 		return
 	}
+	s.changed()
+	s.tellPartners("")
 	s.log.Info("device joined", "person", p.Username, "device", p.Device.ID)
 	writeJSON(w, http.StatusOK, map[string]any{"cert": p.Device.Cert})
 }
@@ -184,14 +186,26 @@ type orgView struct {
 
 // localPeople is this organization's directory: everyone with a device.
 func (s *Server) localPeople() []proto.Person {
+	return s.localPeopleFor(store.Connection{})
+}
+
+// localPeopleFor is the part of the directory a partner may see: the people
+// here who may write with it.
+func (s *Server) localPeopleFor(c store.Connection) []proto.Person {
 	people, _ := s.st.People()
 	out := []proto.Person{}
 	for _, p := range people {
-		if p.State == store.Active && p.Device != nil {
+		if p.State == store.Active && p.Device != nil && c.Allows(p.Username) {
 			out = append(out, proto.Person{Address: p.Device.Cert.Address, Name: p.Name, Devices: []proto.DeviceCert{p.Device.Cert}})
 		}
 	}
 	return out
+}
+
+// notAllowed is what a person hears when their admin has not chosen them to
+// write with a partner.
+func notAllowed(c store.Connection) string {
+	return "You cannot write to " + c.Name + ". Your admin chooses who can, on the Partners page."
 }
 
 // partnerPeople returns a partner's directory, fetched again when older than
@@ -235,22 +249,26 @@ func (s *Server) partnerPeople(ctx context.Context, c store.Connection, fresh bo
 	return valid
 }
 
+// contacts lists colleagues and the people of each partner this person may
+// write with. The directory version is read first, so a change made while
+// the list is built shows as a newer version with the next mail.
 func (s *Server) contacts(w http.ResponseWriter, r *http.Request, c clientSession) {
+	version := s.directoryVersion()
 	o, _, _ := s.org()
 	people := s.localPeople()
 	orgs := []orgView{{Domain: o.Domain, Name: o.Name, Key: proto.B64(o.Pub)}}
 	conns, _ := s.st.Connections()
 	for _, conn := range conns {
-		if conn.State != store.Connected {
+		if conn.State != store.Connected || !conn.Allows(c.user) {
 			continue
 		}
 		orgs = append(orgs, orgView{Domain: conn.Domain, Name: conn.Name, Key: conn.Key})
 		people = append(people, s.partnerPeople(r.Context(), conn, r.URL.Query().Get("fresh") == "1")...)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"self": c.user + "@" + o.Domain, "orgs": orgs, "people": people})
+	writeJSON(w, http.StatusOK, map[string]any{"self": c.user + "@" + o.Domain, "orgs": orgs, "people": people, "directory": version})
 }
 
-func (s *Server) keys(w http.ResponseWriter, r *http.Request, _ clientSession) {
+func (s *Server) keys(w http.ResponseWriter, r *http.Request, c clientSession) {
 	user, domain, err := proto.Address(r.URL.Query().Get("address"))
 	if err != nil {
 		fail(w, http.StatusBadRequest, "Refused.")
@@ -264,6 +282,10 @@ func (s *Server) keys(w http.ResponseWriter, r *http.Request, _ clientSession) {
 		conn, cerr := s.st.Connection(domain)
 		if cerr != nil || conn.State != store.Connected {
 			fail(w, http.StatusForbidden, "Your organization is not connected with "+domain+".")
+			return
+		}
+		if !conn.Allows(c.user) {
+			fail(w, http.StatusForbidden, notAllowed(conn))
 			return
 		}
 		err = s.fedCall(r.Context(), conn, "GET", "/fed/v1/keys?user="+user, nil, &bundles)
@@ -348,8 +370,16 @@ func (s *Server) send(w http.ResponseWriter, r *http.Request, c clientSession) {
 			fail(w, http.StatusForbidden, "Your organization is not connected with "+domain+".")
 			return
 		}
+		if !conn.Allows(c.user) {
+			fail(w, http.StatusForbidden, notAllowed(conn))
+			return
+		}
 		if err := s.forward(r.Context(), conn, envs); err != nil {
 			s.log.Warn("delivery to partner failed", "partner", domain, "err", err)
+			if unreachablePerson(err) {
+				fail(w, http.StatusForbidden, "That person at "+conn.Name+" cannot receive messages from you. Their admin chooses who can.")
+				return
+			}
 			fail(w, http.StatusBadGateway, domain+" could not be reached. Mohur will try again.")
 			return
 		}
@@ -392,7 +422,7 @@ func (s *Server) inbox(w http.ResponseWriter, r *http.Request, c clientSession) 
 	if envs == nil {
 		envs = []proto.Envelope{}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"envelopes": envs})
+	writeJSON(w, http.StatusOK, map[string]any{"envelopes": envs, "directory": s.directoryVersion()})
 }
 
 func (s *Server) ack(w http.ResponseWriter, r *http.Request, c clientSession) {
@@ -410,8 +440,8 @@ func (s *Server) ack(w http.ResponseWriter, r *http.Request, c clientSession) {
 	writeJSON(w, http.StatusOK, map[string]any{})
 }
 
-// canReach reports whether a person here may send to address.
-func (s *Server) canReach(address string) bool {
+// canReach reports whether the person here named from may send to address.
+func (s *Server) canReach(from, address string) bool {
 	user, domain, err := proto.Address(address)
 	if err != nil {
 		return false
@@ -422,13 +452,13 @@ func (s *Server) canReach(address string) bool {
 		return err == nil && p.State == store.Active
 	}
 	conn, err := s.st.Connection(domain)
-	return err == nil && conn.State == store.Connected
+	return err == nil && conn.State == store.Connected && conn.Allows(from)
 }
 
 func (s *Server) blobUpload(w http.ResponseWriter, r *http.Request, c clientSession) {
 	o, _, _ := s.org()
 	to := r.URL.Query().Get("to")
-	if !s.canReach(to) || r.ContentLength > proto.MaxBlob {
+	if !s.canReach(c.user, to) || r.ContentLength > proto.MaxBlob {
 		fail(w, http.StatusBadRequest, "Refused.")
 		return
 	}

@@ -37,6 +37,9 @@ type Server struct {
 	waiters   map[string][]chan struct{}
 	limits    map[string]*window
 	nonces    map[string]clientNonce
+	// directory changes whenever who can write to whom may have changed:
+	// people, partners or a partner's people. Apps read it with their mail.
+	directory int64
 }
 
 type adminSession struct {
@@ -66,7 +69,7 @@ func New(st *store.Store, disc *discover.Verifier, log *slog.Logger) *Server {
 	return &Server{st: st, disc: disc, log: log, now: time.Now,
 		admins: map[[32]byte]adminSession{}, clients: map[[32]byte]clientSession{},
 		setupSeed: map[[32]byte]string{}, waiters: map[string][]chan struct{}{},
-		limits: map[string]*window{}, nonces: map[string]clientNonce{}}
+		limits: map[string]*window{}, nonces: map[string]clientNonce{}, directory: time.Now().Unix()}
 }
 
 // SetClock replaces the clock; tests only.
@@ -101,6 +104,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /admin/api/partners/accept", s.admin(s.partnersAccept))
 	mux.HandleFunc("POST /admin/api/partners/remove", s.admin(s.partnersRemove))
 	mux.HandleFunc("POST /admin/api/partners/trust", s.admin(s.partnersTrust))
+	mux.HandleFunc("POST /admin/api/partners/access", s.admin(s.partnersAccess))
 
 	mux.HandleFunc("POST /api/v1/join", s.join)
 	mux.HandleFunc("POST /api/v1/session/challenge", s.sessionChallenge)
@@ -121,6 +125,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /fed/v1/directory", s.fed(s.fedDirectory))
 	mux.HandleFunc("GET /fed/v1/keys", s.fed(s.fedKeys))
 	mux.HandleFunc("POST /fed/v1/deliver", s.fed(s.fedDeliver))
+	mux.HandleFunc("POST /fed/v1/changed", s.fed(s.fedChanged))
 	mux.HandleFunc("PUT /fed/v1/blobs/{id}", s.fedBlob)
 
 	return secureHeaders(mux)
@@ -207,6 +212,7 @@ func (s *Server) recheckPartners(ctx context.Context) {
 		}
 		if d.Key != c.Key {
 			_ = s.st.KeyMismatch(d)
+			s.changed()
 			s.log.Warn("partner key changed; connection paused", "partner", c.Domain)
 			continue
 		}
@@ -283,6 +289,48 @@ func (s *Server) notify(user string) {
 		close(ch)
 	}
 	delete(s.waiters, user)
+}
+
+// changed records that who can write to whom may have changed and wakes every
+// waiting app, so each reads its contacts at once instead of within a minute.
+func (s *Server) changed() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.directory++
+	for user, list := range s.waiters {
+		for _, ch := range list {
+			close(ch)
+		}
+		delete(s.waiters, user)
+	}
+}
+
+func (s *Server) directoryVersion() int64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.directory
+}
+
+// tellPartners lets connected partners (or only the one named) know that
+// our people changed, so their apps show it at once. It is best effort:
+// partners read our directory again within a minute anyway.
+func (s *Server) tellPartners(only string) {
+	conns, err := s.st.Connections()
+	if err != nil {
+		return
+	}
+	for _, c := range conns {
+		if c.State != store.Connected || (only != "" && c.Domain != only) {
+			continue
+		}
+		go func(c store.Connection) {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if err := s.fedCall(ctx, c, "POST", "/fed/v1/changed", struct{}{}, nil); err != nil {
+				s.log.Debug("partner not told of a change", "partner", c.Domain, "err", err)
+			}
+		}(c)
+	}
 }
 
 func randomID() string {

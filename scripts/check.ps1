@@ -19,6 +19,12 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Go tests failed' }
     go build -trimpath ./...
     if ($LASTEXITCODE -ne 0) { throw 'build failed' }
+    # The app window and the admin pages run only in a browser, so no test
+    # loads them: check that each script at least parses.
+    foreach ($script in @(git ls-files 'client/src/*.mjs' 'client/src/*.cjs' 'web/*.mjs')) {
+        node --check $script
+        if ($LASTEXITCODE -ne 0) { throw "syntax error in $script" }
+    }
     Push-Location client
     try {
         node --test test/

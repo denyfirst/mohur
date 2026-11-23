@@ -51,6 +51,31 @@ server.
    signs a device certificate with the organization key. Partners accept a
    device only with a valid certificate from the pinned organization key.
 
+## Who can write to whom
+
+Colleagues in one organization always see and can write to each other; that
+needs nothing beyond their invites. For each partner, an admin chooses who on
+their own side may write with it: **Everyone** (the default, which includes
+people invited later) or **only the people they choose**. Each side decides
+only for its own people, so two people can write to each other only when both
+admins allow it.
+
+The server enforces the choice, not the app. A partner receives only the
+chosen people in its directory; this server refuses keys, messages and files
+for anyone else here, and refuses to forward anything from them. Removing a
+person also takes them off every chosen list, so a later person with the same
+user name does not inherit it.
+
+Apps learn about changes at once. Each mail check carries a directory version;
+it changes when people join or leave, a partner connects, disconnects or
+changes its key, or an admin changes who may write. A change wakes every
+waiting app, which then reads its contacts again. A server also sends its
+connected partners a signed `POST /fed/v1/changed` when its own people change,
+so their apps update too; without it, a partner's people are read again every
+minute.
+
+## Changed keys
+
 A partner's key change pauses the connection until an admin accepts the new,
 again verified, key. A person's new device is shown in their conversations as a
 notice; a device without a valid certificate is refused outright.

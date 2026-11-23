@@ -345,7 +345,7 @@ func connect(t *testing.T, a, b *org) {
 
 func TestTwoOrganizationsExchangeMessagesAndFiles(t *testing.T) {
 	l := newLab(t)
-	alpha, beta := l.start("alpha.test"), l.start("beta.test")
+	alpha, beta := l.start("alpha.e2e.test"), l.start("beta.e2e.test")
 
 	var check map[string]any
 	alpha.adminCall("domain/check", map[string]any{}, &check, 200)
@@ -357,7 +357,7 @@ func TestTwoOrganizationsExchangeMessagesAndFiles(t *testing.T) {
 	kamran := beta.join(beta.invite("kamran", "Kamran Əliyev"), 200)
 
 	// Before the organizations connect, nothing crosses.
-	aylin.call("GET", "/api/v1/keys?address=kamran@beta.test", nil, nil, 403)
+	aylin.call("GET", "/api/v1/keys?address=kamran@beta.e2e.test", nil, nil, 403)
 
 	connect(t, alpha, beta)
 
@@ -368,7 +368,7 @@ func TestTwoOrganizationsExchangeMessagesAndFiles(t *testing.T) {
 	aylin.call("GET", "/api/v1/contacts", nil, &contacts, 200)
 	found := false
 	for _, p := range contacts.People {
-		if p.Address == "kamran@beta.test" && p.Name == "Kamran Əliyev" && p.Devices[0].Check(beta.key, "beta.test") == nil {
+		if p.Address == "kamran@beta.e2e.test" && p.Name == "Kamran Əliyev" && p.Devices[0].Check(beta.key, "beta.e2e.test") == nil {
 			found = true
 		}
 	}
@@ -379,18 +379,18 @@ func TestTwoOrganizationsExchangeMessagesAndFiles(t *testing.T) {
 	var keys struct {
 		Bundles []proto.Bundle `json:"bundles"`
 	}
-	aylin.call("GET", "/api/v1/keys?address=kamran@beta.test", nil, &keys, 200)
-	if len(keys.Bundles) != 1 || keys.Bundles[0].PreKey == nil || keys.Bundles[0].Cert.Address != "kamran@beta.test" {
+	aylin.call("GET", "/api/v1/keys?address=kamran@beta.e2e.test", nil, &keys, 200)
+	if len(keys.Bundles) != 1 || keys.Bundles[0].PreKey == nil || keys.Bundles[0].Cert.Address != "kamran@beta.e2e.test" {
 		t.Fatalf("bundles = %+v", keys.Bundles)
 	}
 
 	file := bytes.Repeat([]byte("ciphertext"), 50000)
-	blob := aylin.upload("kamran@beta.test", file)
+	blob := aylin.upload("kamran@beta.e2e.test", file)
 	body := randomB64(200, 0)
-	aylin.call("POST", "/api/v1/send", map[string]any{"envelopes": []map[string]any{{"to": "kamran@beta.test", "toDevice": kamran.id, "type": 3, "body": body, "blobs": []string{blob}}}}, nil, 200)
+	aylin.call("POST", "/api/v1/send", map[string]any{"envelopes": []map[string]any{{"to": "kamran@beta.e2e.test", "toDevice": kamran.id, "type": 3, "body": body, "blobs": []string{blob}}}}, nil, 200)
 
 	got := kamran.inbox()
-	if len(got) != 1 || got[0].Body != body || got[0].From != "aylin@alpha.test" || got[0].FromCert.Check(alpha.key, "alpha.test") != nil {
+	if len(got) != 1 || got[0].Body != body || got[0].From != "aylin@alpha.e2e.test" || got[0].FromCert.Check(alpha.key, "alpha.e2e.test") != nil {
 		t.Fatalf("inbox = %+v", got)
 	}
 	data, status := kamran.download(got[0].Blobs[0])
@@ -406,12 +406,12 @@ func TestTwoOrganizationsExchangeMessagesAndFiles(t *testing.T) {
 	}
 
 	// A reply the other way, and a message inside one organization.
-	kamran.call("POST", "/api/v1/send", map[string]any{"envelopes": []map[string]any{{"to": "aylin@alpha.test", "toDevice": aylin.id, "type": 2, "body": body}}}, nil, 200)
-	if in := aylin.inbox(); len(in) != 1 || in[0].From != "kamran@beta.test" {
+	kamran.call("POST", "/api/v1/send", map[string]any{"envelopes": []map[string]any{{"to": "aylin@alpha.e2e.test", "toDevice": aylin.id, "type": 2, "body": body}}}, nil, 200)
+	if in := aylin.inbox(); len(in) != 1 || in[0].From != "kamran@beta.e2e.test" {
 		t.Fatalf("reply inbox = %+v", in)
 	}
 	nigar := alpha.join(alpha.invite("nigar", "Nigar"), 200)
-	nigar.call("POST", "/api/v1/send", map[string]any{"envelopes": []map[string]any{{"to": "aylin@alpha.test", "toDevice": aylin.id, "type": 2, "body": body}}}, nil, 200)
+	nigar.call("POST", "/api/v1/send", map[string]any{"envelopes": []map[string]any{{"to": "aylin@alpha.e2e.test", "toDevice": aylin.id, "type": 2, "body": body}}}, nil, 200)
 	if in := aylin.inbox(); len(in) != 2 {
 		t.Fatalf("local inbox = %d", len(in))
 	}
@@ -419,12 +419,12 @@ func TestTwoOrganizationsExchangeMessagesAndFiles(t *testing.T) {
 
 func TestInvitesWorkOnceAndRemovedPeopleLoseAccess(t *testing.T) {
 	l := newLab(t)
-	alpha := l.start("alpha.test")
+	alpha := l.start("alpha.e2e.test")
 	inv := alpha.invite("aylin", "Aylin")
 	aylin := alpha.join(inv, 200)
 	alpha.join(inv, 403)
-	alpha.join("alpha.test/AAAA-BBBB-CCCC-DDDD-EEEE-FFFF", 403)
-	alpha.join("beta.test/"+strings.SplitN(alpha.invite("other", "Other"), "/", 2)[1], 400)
+	alpha.join("alpha.e2e.test/AAAA-BBBB-CCCC-DDDD-EEEE-FFFF", 403)
+	alpha.join("beta.e2e.test/"+strings.SplitN(alpha.invite("other", "Other"), "/", 2)[1], 400)
 
 	aylin.call("GET", "/api/v1/contacts", nil, nil, 200)
 	alpha.adminCall("people/remove", map[string]any{"username": "aylin"}, nil, 200)
@@ -434,7 +434,7 @@ func TestInvitesWorkOnceAndRemovedPeopleLoseAccess(t *testing.T) {
 
 func TestSessionNeedsTheDeviceKey(t *testing.T) {
 	l := newLab(t)
-	alpha := l.start("alpha.test")
+	alpha := l.start("alpha.e2e.test")
 	aylin := alpha.join(alpha.invite("aylin", "Aylin"), 200)
 	_, other, _ := ed25519.GenerateKey(rand.Reader)
 	aylin.auth = other
@@ -444,7 +444,7 @@ func TestSessionNeedsTheDeviceKey(t *testing.T) {
 
 func TestAdminAPIRefusesCrossSiteAndSignedOut(t *testing.T) {
 	l := newLab(t)
-	alpha := l.start("alpha.test")
+	alpha := l.start("alpha.e2e.test")
 	req, _ := http.NewRequest("GET", alpha.url("/admin/api/people"), nil)
 	req.Header.Set("Origin", "https://"+alpha.server)
 	alpha.do(req, nil, 403) // no X-Mohur header
@@ -487,7 +487,7 @@ func fedRaw(t *testing.T, o, target *org, method, path string, body []byte, muta
 
 func TestFederationRefusesStrangersReplaysAndForgeries(t *testing.T) {
 	l := newLab(t)
-	alpha, beta, gamma := l.start("alpha.test"), l.start("beta.test"), l.start("gamma.test")
+	alpha, beta, gamma := l.start("alpha.e2e.test"), l.start("beta.e2e.test"), l.start("gamma.e2e.test")
 	aylin := alpha.join(alpha.invite("aylin", "Aylin"), 200)
 	kamran := beta.join(beta.invite("kamran", "Kamran"), 200)
 	connect(t, alpha, beta)
@@ -539,7 +539,7 @@ func TestFederationRefusesStrangersReplaysAndForgeries(t *testing.T) {
 	}
 	// A sender outside the partner's domain.
 	other := env
-	other.ID, other.From = randomID(), "someone@gamma.test"
+	other.ID, other.From = randomID(), "someone@gamma.e2e.test"
 	bad, _ = json.Marshal(map[string]any{"envelopes": []proto.Envelope{other}})
 	if s := fedRaw(t, alpha, beta, "POST", "/fed/v1/deliver", bad, nil); s != 400 {
 		t.Fatalf("foreign sender: %d", s)
@@ -551,33 +551,33 @@ func TestFederationRefusesStrangersReplaysAndForgeries(t *testing.T) {
 
 func TestDNSAloneCannotChangeAPartnersKey(t *testing.T) {
 	l := newLab(t)
-	alpha, beta := l.start("alpha.test"), l.start("beta.test")
+	alpha, beta := l.start("alpha.e2e.test"), l.start("beta.e2e.test")
 	connect(t, alpha, beta)
 
 	// Someone who controls only beta's DNS publishes another key. The record
 	// no longer matches beta's signed document, so nothing changes: alpha keeps
 	// the pinned key and the impostor's key is never trusted.
 	impostorPub, _, _ := ed25519.GenerateKey(rand.Reader)
-	l.dns.SetTXT("_mohur.beta.test", proto.TXTValue(beta.server, impostorPub))
+	l.dns.SetTXT("_mohur.beta.e2e.test", proto.TXTValue(beta.server, impostorPub))
 	alpha.srv.recheckPartners(context.Background())
-	c, _ := alpha.st.Connection("beta.test")
+	c, _ := alpha.st.Connection("beta.e2e.test")
 	if c.State != store.Connected || c.Key != proto.B64(beta.key) {
 		t.Fatalf("after a DNS-only change: state %s, key changed %v", c.State, c.Key != proto.B64(beta.key))
 	}
-	alpha.adminCall("partners/trust", map[string]any{"domain": "beta.test", "key": proto.B64(impostorPub)}, nil, 502)
+	alpha.adminCall("partners/trust", map[string]any{"domain": "beta.e2e.test", "key": proto.B64(impostorPub)}, nil, 502)
 }
 
 func TestRebuiltPartnerIsPausedUntilAccepted(t *testing.T) {
 	l := newLab(t)
-	alpha, beta := l.start("alpha.test"), l.start("beta.test")
+	alpha, beta := l.start("alpha.e2e.test"), l.start("beta.e2e.test")
 	aylin := alpha.join(alpha.invite("aylin", "Aylin"), 200)
 	connect(t, alpha, beta)
 
 	// beta rebuilds its server: same domain and name, new organization key,
 	// new record. Everything agrees, but alpha pinned the old key.
-	rebuilt := l.start("beta.test")
+	rebuilt := l.start("beta.e2e.test")
 	alpha.srv.recheckPartners(context.Background())
-	c, _ := alpha.st.Connection("beta.test")
+	c, _ := alpha.st.Connection("beta.e2e.test")
 	if c.State != store.KeyChanged || c.NewKey != proto.B64(rebuilt.key) {
 		t.Fatalf("after a verified key change: state %s", c.State)
 	}
@@ -585,10 +585,10 @@ func TestRebuiltPartnerIsPausedUntilAccepted(t *testing.T) {
 	if s := fedRaw(t, rebuilt, alpha, "GET", "/fed/v1/directory", nil, nil); s != 403 {
 		t.Fatalf("partner call while paused: %d", s)
 	}
-	aylin.call("GET", "/api/v1/keys?address=kamran@beta.test", nil, nil, 403)
+	aylin.call("GET", "/api/v1/keys?address=kamran@beta.e2e.test", nil, nil, 403)
 	// A stale review is refused; the shown new key is accepted.
-	alpha.adminCall("partners/trust", map[string]any{"domain": "beta.test", "key": proto.B64(beta.key)}, nil, 409)
-	alpha.adminCall("partners/trust", map[string]any{"domain": "beta.test", "key": c.NewKey}, nil, 200)
+	alpha.adminCall("partners/trust", map[string]any{"domain": "beta.e2e.test", "key": proto.B64(beta.key)}, nil, 409)
+	alpha.adminCall("partners/trust", map[string]any{"domain": "beta.e2e.test", "key": c.NewKey}, nil, 200)
 	if s := fedRaw(t, rebuilt, alpha, "GET", "/fed/v1/directory", nil, nil); s != 200 {
 		t.Fatalf("partner call after acceptance: %d", s)
 	}
@@ -596,11 +596,11 @@ func TestRebuiltPartnerIsPausedUntilAccepted(t *testing.T) {
 
 func TestDiscoveryRefusesRecordsThatDoNotAgree(t *testing.T) {
 	l := newLab(t)
-	alpha, beta := l.start("alpha.test"), l.start("beta.test")
+	alpha, beta := l.start("alpha.e2e.test"), l.start("beta.e2e.test")
 	_ = beta
 	disc, _ := discover.New(discover.Config{Resolver: l.dns.Addr(), ExtraRoots: []*x509.Certificate{l.ca}, AllowPrivate: true})
 	ctx := context.Background()
-	if _, err := disc.Lookup(ctx, "beta.test"); err != nil {
+	if _, err := disc.Lookup(ctx, "beta.e2e.test"); err != nil {
 		t.Fatalf("genuine lookup: %v", err)
 	}
 	cases := map[string][]string{
@@ -611,20 +611,20 @@ func TestDiscoveryRefusesRecordsThatDoNotAgree(t *testing.T) {
 		"garbage":            {"v=mohur1 server=" + beta.server + " key=xyz"},
 	}
 	for name, txt := range cases {
-		l.dns.SetTXT("_mohur.beta.test", txt...)
-		if _, err := disc.Lookup(ctx, "beta.test"); err == nil {
+		l.dns.SetTXT("_mohur.beta.e2e.test", txt...)
+		if _, err := disc.Lookup(ctx, "beta.e2e.test"); err == nil {
 			t.Errorf("%s: lookup succeeded", name)
 		}
 	}
 	// Without AllowPrivate, a record pointing at loopback is refused.
-	l.dns.SetTXT("_mohur.beta.test", proto.TXTValue(beta.server, beta.key))
+	l.dns.SetTXT("_mohur.beta.e2e.test", proto.TXTValue(beta.server, beta.key))
 	strict, _ := discover.New(discover.Config{Resolver: l.dns.Addr(), ExtraRoots: []*x509.Certificate{l.ca}})
-	if _, err := strict.Lookup(ctx, "beta.test"); err == nil {
+	if _, err := strict.Lookup(ctx, "beta.e2e.test"); err == nil {
 		t.Error("private address accepted without AllowPrivate")
 	}
 	// Without the lab CA, the certificate is not trusted.
 	untrusting, _ := discover.New(discover.Config{Resolver: l.dns.Addr(), AllowPrivate: true})
-	if _, err := untrusting.Lookup(ctx, "beta.test"); err == nil {
+	if _, err := untrusting.Lookup(ctx, "beta.e2e.test"); err == nil {
 		t.Error("untrusted certificate accepted")
 	}
 	_ = fmt.Sprint()
@@ -637,21 +637,21 @@ func sha256Sum(b []byte) []byte {
 
 func TestStaleRequestIsNotConnectedWithAnotherKey(t *testing.T) {
 	l := newLab(t)
-	alpha, beta := l.start("alpha.test"), l.start("beta.test")
+	alpha, beta := l.start("alpha.e2e.test"), l.start("beta.e2e.test")
 	var res map[string]any
-	beta.adminCall("partners/connect", map[string]any{"domain": "alpha.test"}, &res, 200)
-	if c, _ := alpha.st.Connection("beta.test"); c.State != store.Incoming {
+	beta.adminCall("partners/connect", map[string]any{"domain": "alpha.e2e.test"}, &res, 200)
+	if c, _ := alpha.st.Connection("beta.e2e.test"); c.State != store.Incoming {
 		t.Fatalf("alpha sees %s", c.State)
 	}
 	// beta rebuilds before alpha answers: its old request carries an old key.
-	l.start("beta.test")
-	alpha.adminCall("partners/accept", map[string]any{"domain": "beta.test"}, nil, 409)
-	alpha.adminCall("partners/connect", map[string]any{"domain": "beta.test"}, nil, 409)
-	c, _ := alpha.st.Connection("beta.test")
+	l.start("beta.e2e.test")
+	alpha.adminCall("partners/accept", map[string]any{"domain": "beta.e2e.test"}, nil, 409)
+	alpha.adminCall("partners/connect", map[string]any{"domain": "beta.e2e.test"}, nil, 409)
+	c, _ := alpha.st.Connection("beta.e2e.test")
 	if c.State != store.Incoming || c.Key != proto.B64(beta.key) {
 		t.Fatalf("stale request became %s", c.State)
 	}
 	// Declining clears it; asking again works with the new key.
-	alpha.adminCall("partners/remove", map[string]any{"domain": "beta.test"}, nil, 200)
-	alpha.adminCall("partners/connect", map[string]any{"domain": "beta.test"}, &res, 200)
+	alpha.adminCall("partners/remove", map[string]any{"domain": "beta.e2e.test"}, nil, 200)
+	alpha.adminCall("partners/connect", map[string]any{"domain": "beta.e2e.test"}, &res, 200)
 }

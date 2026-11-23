@@ -48,6 +48,23 @@ func (s *Server) signRequest(req *http.Request, to string, bodyHash []byte) erro
 	return nil
 }
 
+// fedError is a partner's answer other than 200. A 404 means the partner has
+// no one at that address whom we may reach; trying again will not help.
+type fedError struct {
+	partner string
+	status  int
+	msg     string
+}
+
+func (e *fedError) Error() string {
+	return fmt.Sprintf("%s answered %d: %s", e.partner, e.status, e.msg)
+}
+
+func unreachablePerson(err error) bool {
+	var fe *fedError
+	return errors.As(err, &fe) && fe.status == http.StatusNotFound
+}
+
 // fedCall sends a signed JSON request to a partner and decodes its answer.
 func (s *Server) fedCall(ctx context.Context, c store.Connection, method, path string, in, out any) error {
 	var body []byte
@@ -79,7 +96,7 @@ func (s *Server) fedCall(ctx context.Context, c store.Connection, method, path s
 	if resp.StatusCode != http.StatusOK {
 		var p Problem
 		_ = json.NewDecoder(io.LimitReader(resp.Body, 4<<10)).Decode(&p)
-		return fmt.Errorf("%s answered %d: %s", c.Domain, resp.StatusCode, p.Error)
+		return &fedError{partner: c.Domain, status: resp.StatusCode, msg: p.Error}
 	}
 	if out == nil {
 		return nil
@@ -143,7 +160,7 @@ func (s *Server) putBlob(ctx context.Context, c store.Connection, id string) err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("%s refused a file: %d", c.Domain, resp.StatusCode)
+		return &fedError{partner: c.Domain, status: resp.StatusCode, msg: "a file was refused"}
 	}
 	return nil
 }
@@ -204,6 +221,9 @@ func (s *Server) fedConnect(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusConflict, "Refused.")
 		return
 	}
+	if c.State == store.Connected {
+		s.changed()
+	}
 	s.log.Info("connection request received", "partner", f.from, "state", c.State)
 	writeJSON(w, http.StatusOK, map[string]any{"state": c.State})
 }
@@ -257,24 +277,43 @@ func (s *Server) fedAccept(w http.ResponseWriter, _ *http.Request, c store.Conne
 		fail(w, http.StatusConflict, "Refused.")
 		return
 	}
+	s.changed()
 	s.log.Info("connection accepted by partner", "partner", c.Domain)
 	writeJSON(w, http.StatusOK, map[string]any{})
 }
 
 func (s *Server) fedDisconnect(w http.ResponseWriter, _ *http.Request, c store.Connection, _ []byte) {
 	_ = s.st.Disconnect(c.Domain)
+	s.changed()
 	s.log.Info("connection removed by partner", "partner", c.Domain)
 	writeJSON(w, http.StatusOK, map[string]any{})
 }
 
-func (s *Server) fedDirectory(w http.ResponseWriter, _ *http.Request, _ store.Connection, _ []byte) {
-	writeJSON(w, http.StatusOK, s.localPeople())
+// fedChanged is a partner telling us its people changed: forget its cached
+// directory and let our apps read their contacts again.
+func (s *Server) fedChanged(w http.ResponseWriter, r *http.Request, c store.Connection, _ []byte) {
+	if !s.allow(r, "fed-changed", 60) {
+		fail(w, http.StatusTooManyRequests, "Refused.")
+		return
+	}
+	_ = s.st.DropDirectory(c.Domain)
+	s.changed()
+	writeJSON(w, http.StatusOK, map[string]any{})
 }
 
-func (s *Server) fedKeys(w http.ResponseWriter, r *http.Request, _ store.Connection, _ []byte) {
+// fedDirectory gives a partner only the people here who may write with it.
+func (s *Server) fedDirectory(w http.ResponseWriter, _ *http.Request, c store.Connection, _ []byte) {
+	writeJSON(w, http.StatusOK, s.localPeopleFor(c))
+}
+
+func (s *Server) fedKeys(w http.ResponseWriter, r *http.Request, c store.Connection, _ []byte) {
 	user := r.URL.Query().Get("user")
 	if !proto.Username(user) {
 		fail(w, http.StatusBadRequest, "Refused.")
+		return
+	}
+	if !c.Allows(user) {
+		fail(w, http.StatusNotFound, "Refused.")
 		return
 	}
 	b, err := s.st.TakeBundle(user)
@@ -303,6 +342,10 @@ func (s *Server) fedDeliver(w http.ResponseWriter, _ *http.Request, c store.Conn
 		if e.CheckShape() != nil || ferr != nil || fromDomain != c.Domain || toDomain != o.Domain || !proto.ID(e.ID) ||
 			e.FromCert.Check(key, c.Domain) != nil || e.FromCert.Address != e.From || e.FromCert.Device != e.FromDevice {
 			fail(w, http.StatusBadRequest, "Refused.")
+			return
+		}
+		if toUser, _, _ := proto.Address(e.To); !c.Allows(toUser) {
+			fail(w, http.StatusNotFound, "Refused.")
 			return
 		}
 		for _, id := range e.Blobs {
@@ -344,7 +387,7 @@ func (s *Server) fedBlob(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusForbidden, "Refused.")
 		return
 	}
-	if p, err := s.st.Person(toUser); err != nil || p.State != store.Active {
+	if p, err := s.st.Person(toUser); err != nil || p.State != store.Active || !c.Allows(toUser) {
 		fail(w, http.StatusNotFound, "Refused.")
 		return
 	}
