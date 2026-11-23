@@ -179,7 +179,16 @@ func run() error {
 		var res struct {
 			Invite string `json:"invite"`
 		}
-		if err := out.Orgs[parts[0]].call("people/invite", map[string]any{"username": parts[1], "name": parts[2]}, &res); err != nil {
+		// In the lab, everyone invited may write with every partner.
+		partners := []string{}
+		if !*noConnect {
+			for _, o := range list {
+				if o.Domain != parts[0] {
+					partners = append(partners, o.Domain)
+				}
+			}
+		}
+		if err := out.Orgs[parts[0]].call("people/invite", map[string]any{"username": parts[1], "name": parts[2], "partners": partners}, &res); err != nil {
 			return err
 		}
 		out.Invites[parts[1]+"@"+parts[0]] = res.Invite

@@ -356,8 +356,10 @@ type personView struct {
 	InviteExpires int64  `json:"inviteExpires,omitempty"`
 	Device        string `json:"device,omitempty"`
 	Joined        int64  `json:"joined,omitempty"`
-	// Partners names the connected partners this person may write with.
-	Partners []string `json:"partners"`
+	// Partners names the connected partners this person may write with;
+	// PartnerDomains lists every partner they are chosen for, in any state.
+	Partners       []string `json:"partners"`
+	PartnerDomains []string `json:"partnerDomains"`
 }
 
 func (s *Server) peopleList(w http.ResponseWriter, _ *http.Request, _ string) {
@@ -371,12 +373,17 @@ func (s *Server) peopleList(w http.ResponseWriter, _ *http.Request, _ string) {
 	sort.Slice(conns, func(i, j int) bool { return conns[i].Name < conns[j].Name })
 	out := make([]personView, 0, len(people))
 	for _, p := range people {
-		v := personView{Username: p.Username, Address: p.Username + "@" + o.Domain, Name: p.Name, State: p.State, InviteExpires: p.InviteExpires, Partners: []string{}}
+		v := personView{Username: p.Username, Address: p.Username + "@" + o.Domain, Name: p.Name, State: p.State, InviteExpires: p.InviteExpires,
+			Partners: []string{}, PartnerDomains: []string{}}
 		if p.Device != nil {
 			v.Device, v.Joined = p.Device.Label, p.Device.Joined
 		}
 		for _, c := range conns {
-			if c.State == store.Connected && c.Allows(p.Username) {
+			if !c.Allows(p.Username) {
+				continue
+			}
+			v.PartnerDomains = append(v.PartnerDomains, c.Domain)
+			if c.State == store.Connected {
 				v.Partners = append(v.Partners, c.Name)
 			}
 		}
@@ -396,10 +403,11 @@ func (s *Server) inviteText(code string) string {
 
 func (s *Server) peopleInvite(w http.ResponseWriter, r *http.Request, admin string) {
 	var in struct {
-		Username string `json:"username"`
-		Name     string `json:"name"`
+		Username string   `json:"username"`
+		Name     string   `json:"name"`
+		Partners []string `json:"partners"`
 	}
-	if readJSON(r, 4<<10, &in) != nil {
+	if readJSON(r, 64<<10, &in) != nil {
 		fail(w, http.StatusBadRequest, "Refused.")
 		return
 	}
@@ -407,6 +415,11 @@ func (s *Server) peopleInvite(w http.ResponseWriter, r *http.Request, admin stri
 	name, ok := proto.DisplayName(in.Name)
 	if !proto.Username(user) || !ok {
 		fail(w, http.StatusBadRequest, "Enter a name and a short user name of lowercase letters and digits.")
+		return
+	}
+	partners, ok := s.knownPartners(in.Partners)
+	if !ok {
+		fail(w, http.StatusBadRequest, "Choose partners from your Partners page.")
 		return
 	}
 	code, p, err := s.st.Invite(user, name)
@@ -418,8 +431,97 @@ func (s *Server) peopleInvite(w http.ResponseWriter, r *http.Request, admin stri
 		fail(w, http.StatusInternalServerError, "The invite could not be made.")
 		return
 	}
-	s.log.Info("invite made", "admin", admin, "person", user)
+	// Without a partner list, a renewed invite keeps the person's partners.
+	if in.Partners != nil {
+		changed, err := s.st.SetPartners(user, partners)
+		if err != nil {
+			fail(w, http.StatusInternalServerError, "The invite was made, but its partners were not saved. Choose them on the People page.")
+			return
+		}
+		s.partnersChanged(changed)
+	}
+	s.log.Info("invite made", "admin", admin, "person", user, "partners", len(partners))
 	writeJSON(w, http.StatusOK, map[string]any{"invite": s.inviteText(code), "expires": p.InviteExpires})
+}
+
+// knownPartners checks domains an admin picked against the partner list.
+func (s *Server) knownPartners(domains []string) ([]string, bool) {
+	if len(domains) > 1000 {
+		return nil, false
+	}
+	out := make([]string, 0, len(domains))
+	for _, d := range domains {
+		d, err := proto.Domain(d)
+		if err != nil {
+			return nil, false
+		}
+		if _, err := s.st.Connection(d); err != nil {
+			return nil, false
+		}
+		out = append(out, d)
+	}
+	return out, true
+}
+
+// partnersChanged tells apps here and the partners whose lists changed.
+func (s *Server) partnersChanged(domains []string) {
+	if len(domains) == 0 {
+		return
+	}
+	s.changed()
+	for _, d := range domains {
+		s.tellPartners(d)
+	}
+}
+
+// peoplePartners sets which partners one person may write with.
+func (s *Server) peoplePartners(w http.ResponseWriter, r *http.Request, admin string) {
+	var in struct {
+		Username string   `json:"username"`
+		Partners []string `json:"partners"`
+	}
+	if readJSON(r, 64<<10, &in) != nil || !proto.Username(in.Username) {
+		fail(w, http.StatusBadRequest, "Refused.")
+		return
+	}
+	partners, ok := s.knownPartners(in.Partners)
+	if !ok {
+		fail(w, http.StatusBadRequest, "Choose partners from your Partners page.")
+		return
+	}
+	changed, err := s.st.SetPartners(in.Username, partners)
+	if errors.Is(err, store.ErrNotFound) {
+		fail(w, http.StatusNotFound, "That person is not in your organization.")
+		return
+	}
+	if err != nil {
+		fail(w, http.StatusBadRequest, "Choose partners from your Partners page.")
+		return
+	}
+	s.partnersChanged(changed)
+	s.log.Info("person's partners changed", "admin", admin, "person", in.Username, "partners", len(partners))
+	writeJSON(w, http.StatusOK, map[string]any{"partners": partners})
+}
+
+// partnerChoices lists the partners an admin can pick, without asking them
+// anything, for the invite and person dialogs.
+func (s *Server) partnerChoices(w http.ResponseWriter, _ *http.Request, _ string) {
+	conns, err := s.st.Connections()
+	if err != nil {
+		fail(w, http.StatusInternalServerError, "The list could not be read.")
+		return
+	}
+	sort.Slice(conns, func(i, j int) bool { return conns[i].Name < conns[j].Name })
+	type choice struct {
+		Domain string `json:"domain"`
+		Name   string `json:"name"`
+		State  string `json:"state"`
+	}
+	out := make([]choice, 0, len(conns))
+	for _, c := range conns {
+		out = append(out, choice{Domain: c.Domain, Name: c.Name, State: c.State})
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (s *Server) peopleRemove(w http.ResponseWriter, r *http.Request, admin string) {
@@ -473,9 +575,8 @@ type partnerView struct {
 	NewKey       string `json:"newKey,omitempty"`
 	NewName      string `json:"newName,omitempty"`
 	NewCode      string `json:"newCode,omitempty"`
-	// Chosen and People say who here may write with the partner; Theirs is
-	// how many of the partner's people our people see.
-	Chosen bool     `json:"chosen"`
+	// People are who here may write with the partner; Theirs is how many of
+	// the partner's people our people see.
 	People []string `json:"people"`
 	Theirs *int     `json:"theirs,omitempty"`
 }
@@ -509,7 +610,7 @@ func (s *Server) partnersList(w http.ResponseWriter, r *http.Request, _ string) 
 	out := make([]partnerView, 0, len(conns))
 	for i, c := range conns {
 		v := partnerView{Domain: c.Domain, Name: c.Name, Server: c.Server, State: c.State, Created: c.Created, Updated: c.Updated,
-			Chosen: c.Chosen, People: append([]string{}, c.People...), Theirs: theirs[i]}
+			People: append([]string{}, c.People...), Theirs: theirs[i]}
 		if k, err := proto.PublicKey(c.Key); err == nil {
 			v.SecurityCode = proto.Fingerprint(o.Key(), k)
 		}
@@ -675,13 +776,12 @@ func (s *Server) partnersTrust(w http.ResponseWriter, r *http.Request, admin str
 	writeJSON(w, http.StatusOK, map[string]any{})
 }
 
-// partnersAccess sets who here may write with a partner: everyone, or only
-// the chosen people. The partner then sees only them, and our server refuses
+// partnersAccess sets who here may write with a partner: only the chosen
+// people, or no one. The partner then sees only them, and our server refuses
 // anything to or from anyone else here.
 func (s *Server) partnersAccess(w http.ResponseWriter, r *http.Request, admin string) {
 	var in struct {
 		Domain string   `json:"domain"`
-		Chosen bool     `json:"chosen"`
 		People []string `json:"people"`
 	}
 	if readJSON(r, 256<<10, &in) != nil || len(in.People) > store.MaxChosen {
@@ -699,7 +799,7 @@ func (s *Server) partnersAccess(w http.ResponseWriter, r *http.Request, admin st
 			return
 		}
 	}
-	c, err := s.st.SetAccess(d, in.Chosen, in.People)
+	c, err := s.st.SetAccess(d, in.People)
 	if errors.Is(err, store.ErrNotFound) {
 		fail(w, http.StatusNotFound, "There is no connection with this organization.")
 		return
@@ -710,6 +810,6 @@ func (s *Server) partnersAccess(w http.ResponseWriter, r *http.Request, admin st
 	}
 	s.changed()
 	s.tellPartners(c.Domain)
-	s.log.Info("partner access changed", "admin", admin, "partner", c.Domain, "chosen", c.Chosen, "people", len(c.People))
-	writeJSON(w, http.StatusOK, map[string]any{"chosen": c.Chosen, "people": append([]string{}, c.People...)})
+	s.log.Info("partner access changed", "admin", admin, "partner", c.Domain, "people", len(c.People))
+	writeJSON(w, http.StatusOK, map[string]any{"people": append([]string{}, c.People...)})
 }

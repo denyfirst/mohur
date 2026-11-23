@@ -361,6 +361,10 @@ func TestTwoOrganizationsExchangeMessagesAndFiles(t *testing.T) {
 	aylin.call("GET", "/api/v1/keys?address=kamran@beta.e2e.test", nil, nil, 403)
 
 	connect(t, alpha, beta)
+	// Until each side chooses its people, still nothing crosses.
+	aylin.call("GET", "/api/v1/keys?address=kamran@beta.e2e.test", nil, nil, 403)
+	alpha.adminCall("partners/access", map[string]any{"domain": "beta.e2e.test", "people": []string{"aylin"}}, nil, 200)
+	beta.adminCall("partners/access", map[string]any{"domain": "alpha.e2e.test", "people": []string{"kamran"}}, nil, 200)
 
 	var contacts struct {
 		People []proto.Person `json:"people"`
@@ -492,6 +496,8 @@ func TestFederationRefusesStrangersReplaysAndForgeries(t *testing.T) {
 	aylin := alpha.join(alpha.invite("aylin", "Aylin"), 200)
 	kamran := beta.join(beta.invite("kamran", "Kamran"), 200)
 	connect(t, alpha, beta)
+	alpha.adminCall("partners/access", map[string]any{"domain": "beta.e2e.test", "people": []string{"aylin"}}, nil, 200)
+	beta.adminCall("partners/access", map[string]any{"domain": "alpha.e2e.test", "people": []string{"kamran"}}, nil, 200)
 
 	env := proto.Envelope{ID: randomID(), From: aylin.address, FromDevice: aylin.id, FromCert: aylin.cert, To: kamran.address, ToDevice: kamran.id, Type: 2, Body: randomB64(64, 0)}
 	good, _ := json.Marshal(map[string]any{"envelopes": []proto.Envelope{env}})

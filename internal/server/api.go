@@ -186,16 +186,20 @@ type orgView struct {
 
 // localPeople is this organization's directory: everyone with a device.
 func (s *Server) localPeople() []proto.Person {
-	return s.localPeopleFor(store.Connection{})
+	return s.directoryWhere(func(string) bool { return true })
 }
 
 // localPeopleFor is the part of the directory a partner may see: the people
 // here who may write with it.
 func (s *Server) localPeopleFor(c store.Connection) []proto.Person {
+	return s.directoryWhere(c.Allows)
+}
+
+func (s *Server) directoryWhere(include func(username string) bool) []proto.Person {
 	people, _ := s.st.People()
 	out := []proto.Person{}
 	for _, p := range people {
-		if p.State == store.Active && p.Device != nil && c.Allows(p.Username) {
+		if p.State == store.Active && p.Device != nil && include(p.Username) {
 			out = append(out, proto.Person{Address: p.Device.Cert.Address, Name: p.Name, Devices: []proto.DeviceCert{p.Device.Cert}})
 		}
 	}

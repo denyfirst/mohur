@@ -153,9 +153,14 @@ function requests(prt) {
   $('rail-requests').textContent = n;
 }
 
-// writesWith says, for one person, whom they can write to.
+// writesWith says, for one person, whom they can write to, and with which
+// chosen partners once the connection is made.
 function writesWith(p) {
-  return p.partners && p.partners.length ? 'Writes with ' + listWords(['colleagues', ...p.partners]) : 'Writes with colleagues only';
+  const now = p.partners || [];
+  const later = (p.partnerDomains || []).map((d) => partnerChoices.find((c) => c.domain === d))
+    .filter((c) => c && c.state !== 'connected').map((c) => c.name);
+  const words = now.length ? 'Writes with ' + listWords(['colleagues', ...now]) : later.length ? 'Writes with colleagues' : 'Writes with colleagues only';
+  return later.length ? `${words} · ${listWords(later)} once connected` : words;
 }
 
 function listWords(items) {
@@ -164,9 +169,29 @@ function listWords(items) {
   return items.slice(0, -1).join(', ') + ' and ' + items[items.length - 1];
 }
 
+// choiceWord says where a partner stands, next to its name in a picker.
+const choiceWords = { outgoing: 'waiting for them', incoming: 'wants to connect', 'key-changed': 'key changed' };
+
+// pickList fills a list of checkboxes: items are [value, label, note].
+function pickList(ul, name, items, checked, empty) {
+  ul.replaceChildren();
+  for (const [value, label, note] of items) {
+    const box = el('input', { type: 'checkbox', name, value });
+    box.checked = checked.includes(value);
+    ul.append(el('li', {}, el('label', {}, box, el('span', {}, label), el('span', { class: 'sub' }, note || ''))));
+  }
+  if (!items.length) ul.append(el('li', { class: 'none' }, empty));
+}
+
+const picked = (ul) => [...ul.querySelectorAll('input:checked')].map((b) => b.value);
+const partnerItems = (choices) => choices.map((c) => [c.domain, c.name, choiceWords[c.state] || c.domain]);
+
+let partnerChoices = [];
+
 async function people() {
   $('people-title').textContent = 'People in ' + state.org.name;
-  const list = await api('people');
+  const [list, choices] = await Promise.all([api('people'), api('partners/choices')]);
+  partnerChoices = choices;
   const ul = $('people-list');
   ul.replaceChildren();
   $('people-empty').hidden = list.length > 0;
@@ -183,9 +208,21 @@ async function people() {
     }
     side.append(el('button', { type: 'button', class: 'secondary small', onclick: () => removePerson(p) }, 'Remove'));
     const sub = p.state === 'active' ? `${p.address} · ${p.device} · joined ${when(p.joined)}` : `${p.address} · invite works until ${when(p.inviteExpires)}`;
+    const writes = el('span', { class: 'access-line' }, writesWith(p));
+    if (choices.length) writes.append(el('button', { type: 'button', class: 'link-button', onclick: () => openPerson(p) }, 'Change partners'));
     ul.append(el('li', { class: 'row' }, el('span', { class: 'avatar', 'aria-hidden': 'true' }, initials),
-      el('div', { class: 'row-main' }, el('strong', {}, p.name), el('span', { class: 'sub' }, sub), el('span', { class: 'sub' }, writesWith(p))), side));
+      el('div', { class: 'row-main' }, el('strong', {}, p.name), el('span', { class: 'sub' }, sub), writes), side));
   }
+}
+
+let personFor = null;
+function openPerson(p) {
+  personFor = p;
+  const d = $('person-dialog');
+  $('person-title').textContent = `Partners ${p.name} can write with`;
+  pickList($('person-partners'), 'partners', partnerItems(partnerChoices), p.partnerDomains || [], 'No partners yet.');
+  notice(d, '');
+  d.showModal();
 }
 
 function openInvite(person) {
@@ -200,6 +237,8 @@ function openInvite(person) {
     $('invite-name').value = person.name;
     $('invite-user').value = person.username;
   }
+  pickList($('invite-partners'), 'partners', partnerItems(partnerChoices), person ? person.partnerDomains || [] : [], '');
+  $('invite-partners-box').hidden = partnerChoices.length === 0;
   d.showModal();
   (person ? $('invite-form').querySelector('[type=submit]') : $('invite-name')).focus();
 }
@@ -244,7 +283,6 @@ function theirsWords(p) {
 }
 
 function accessWords(p, names) {
-  if (!p.chosen) return 'Everyone at ' + state.org.name;
   if (!p.people.length) return 'No one yet';
   return listWords(p.people.map((u) => names[u] || u));
 }
@@ -274,8 +312,8 @@ async function partners() {
       side.append(el('button', { type: 'button', class: 'secondary small', onclick: () => removePartner(p, p.state === 'outgoing' ? 'Cancel request' : 'Disconnect') }, p.state === 'outgoing' ? 'Cancel' : 'Disconnect'));
     }
     const sub = p.state === 'incoming' ? `${p.domain} · verified by its domain · asked ${when(p.updated)}` : `${p.domain}${theirsWords(p)} · since ${when(p.created)}`;
-    const access = p.state === 'incoming' ? null : el('span', { class: 'access-line' }, 'Who can write:', el('strong', {}, accessWords(p, names)),
-      el('button', { type: 'button', class: 'link-button', onclick: () => openAccess(p, ppl) }, 'Change'));
+    const access = p.state === 'incoming' ? null : el('span', { class: 'access-line', 'data-kind': p.people.length ? 'some' : 'none' }, 'Who can write:', el('strong', {}, accessWords(p, names)),
+      el('button', { type: 'button', class: 'link-button', onclick: () => openAccess(p, ppl) }, p.people.length ? 'Change' : 'Choose people'));
     const details = p.securityCode ? el('details', {}, el('summary', {}, 'Security code'),
       el('p', { class: 'help' }, 'Both admins see the same code. You do not need to compare it, but you can, on a call, for extra certainty.'),
       el('p', { class: 'code-groups' }, p.securityCode)) : null;
@@ -289,8 +327,9 @@ async function partners() {
 async function accept(p) {
   try {
     await api('partners/accept', { domain: p.domain });
-    notice($('page-partners'), `Connected with ${p.name}. Everyone at ${state.org.name} can now write to the people ${p.name} chooses. To choose who on your side, press Change.`);
+    notice($('page-partners'), `Connected with ${p.name}.`);
     await partners();
+    openAccess({ ...p, state: 'connected', people: [] }, await api('people'), true);
   } catch (e) { notice($('page-partners'), e.message, 'bad'); }
 }
 
@@ -313,29 +352,19 @@ async function removePartner(p, verb) {
 }
 
 let accessFor = null;
-function openAccess(p, ppl) {
+// openAccess asks who here can write with a partner. Right after a connection
+// is made, it says that no one can yet, and Later leaves it so.
+function openAccess(p, ppl, fresh) {
   accessFor = p;
   const d = $('access-dialog');
   $('access-title').textContent = `Who at ${state.org.name} can write with ${p.name}?`;
-  $('access-everyone-sub').textContent = `Everyone at ${state.org.name}, including people you invite later.`;
-  const ul = $('access-people');
-  ul.replaceChildren();
-  for (const x of ppl) {
-    const box = el('input', { type: 'checkbox', name: 'people', value: x.username });
-    box.checked = p.chosen && p.people.includes(x.username);
-    ul.append(el('li', {}, el('label', {}, box, el('span', {}, x.name), el('span', { class: 'sub' }, x.address))));
-  }
-  if (!ppl.length) ul.append(el('li', { class: 'sub' }, 'No one here yet. Invite people on the People page.'));
-  $('access-form').elements.who.value = p.chosen ? 'chosen' : 'everyone';
-  syncAccess();
+  $('access-hint').textContent = (fresh ? `No one can yet. ` : '') +
+    `Only the people you tick see ${p.name}'s people and can write to them; ${p.name} sees only them. People you invite later are added only when you tick them.`;
+  pickList($('access-people'), 'people', ppl.map((x) => [x.username, x.name, x.address]), p.people || [], 'No one here yet. Invite people on the People page.');
+  $('access-all').hidden = ppl.length < 2;
+  $('access-cancel').textContent = fresh ? 'Later' : 'Cancel';
   notice(d, '');
   d.showModal();
-}
-
-function syncAccess() {
-  const chosen = $('access-form').elements.who.value === 'chosen';
-  for (const b of $('access-people').querySelectorAll('input')) b.disabled = !chosen;
-  $('access-people').setAttribute('aria-disabled', String(!chosen));
 }
 
 let found = null;
@@ -509,7 +538,7 @@ function wire() {
   $('invite-user').addEventListener('input', () => { $('invite-user').dataset.touched = '1'; });
   $('invite-form').addEventListener('submit', async (ev) => {
     ev.preventDefault();
-    const f = Object.fromEntries(new FormData(ev.target));
+    const f = { name: $('invite-name').value, username: $('invite-user').value, partners: picked($('invite-partners')) };
     try {
       const res = await api('people/invite', f);
       showInvite(f.name, res);
@@ -518,19 +547,28 @@ function wire() {
     } catch (e) { notice($('invite-dialog'), e.message, 'bad'); }
   });
 
-  $('access-form').addEventListener('change', syncAccess);
+  $('access-all').addEventListener('click', () => {
+    for (const b of $('access-people').querySelectorAll('input')) b.checked = true;
+  });
   $('access-form').addEventListener('submit', async (ev) => {
     ev.preventDefault();
-    const chosen = ev.target.elements.who.value === 'chosen';
-    const picked = [...$('access-people').querySelectorAll('input:checked')].map((b) => b.value);
+    const people = picked($('access-people'));
     try {
-      await api('partners/access', { domain: accessFor.domain, chosen, people: chosen ? picked : [] });
+      await api('partners/access', { domain: accessFor.domain, people });
       $('access-dialog').close();
-      const org = state.org.name;
-      notice($('page-partners'), !chosen ? `Saved. Everyone at ${org} can write with ${accessFor.name}.`
-        : picked.length ? `Saved. Only the people you chose can write with ${accessFor.name}.` : `Saved. No one at ${org} can write with ${accessFor.name} now.`);
+      notice($('page-partners'), people.length ? `Saved. ${people.length === 1 ? 'One person' : people.length + ' people'} here can write with ${accessFor.name}.`
+        : `Saved. No one at ${state.org.name} can write with ${accessFor.name}.`);
       await partners();
     } catch (e) { notice($('access-dialog'), e.message, 'bad'); }
+  });
+  $('person-form').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    try {
+      await api('people/partners', { username: personFor.username, partners: picked($('person-partners')) });
+      $('person-dialog').close();
+      notice($('page-people'), `Saved ${personFor.name}'s partners.`);
+      await people();
+    } catch (e) { notice($('person-dialog'), e.message, 'bad'); }
   });
 
   $('connect-open').addEventListener('click', openConnect);
@@ -557,6 +595,7 @@ function wire() {
       $('connect-dialog').close();
       notice($('page-partners'), res.state === 'connected' ? `Connected with ${found.name}.` : `Request sent. ${found.name}'s admin will see it on their Partners page.`);
       await partners();
+      openAccess({ domain: found.domain, name: found.name, people: [] }, await api('people'), true);
     } catch (e) { notice($('connect-dialog'), e.message, 'bad'); }
   });
 
