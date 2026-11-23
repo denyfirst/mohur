@@ -83,7 +83,7 @@ func (s *Server) Handler() http.Handler {
 
 	// Admin pages: one document; the script shows the right view.
 	mux.HandleFunc("GET /{$}", s.page)
-	for _, p := range []string{"/people", "/partners", "/domain", "/signin", "/setup"} {
+	for _, p := range []string{"/people", "/partners", "/domain", "/signin", "/setup", "/reset"} {
 		mux.HandleFunc("GET "+p, s.page)
 	}
 	mux.Handle("GET /assets/", http.StripPrefix("/assets/", web.Assets()))
@@ -93,6 +93,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /admin/api/setup/finish", s.setupFinish)
 	mux.HandleFunc("POST /admin/api/signin", s.signIn)
 	mux.HandleFunc("POST /admin/api/signout", s.signOut)
+	mux.HandleFunc("POST /admin/api/reset/start", s.resetStart)
+	mux.HandleFunc("POST /admin/api/reset/finish", s.resetFinish)
 	mux.HandleFunc("POST /admin/api/domain/check", s.admin(s.domainCheck))
 	mux.HandleFunc("GET /admin/api/people", s.admin(s.peopleList))
 	mux.HandleFunc("POST /admin/api/people/invite", s.admin(s.peopleInvite))

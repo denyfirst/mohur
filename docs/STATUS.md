@@ -5,7 +5,8 @@
 ## Works, with tests
 
 - **Server (`mohurd`)**: first-run setup with a one-time code, admin sign-in
-  with password and authenticator code, the domain record and its **Check**,
+  with password and authenticator code, an admin reset by the server's
+  operator (`mohurd reset-admin`) for a forgotten password, the domain record and its **Check**,
   people and one-time invites, partners by domain (connect, accept, remove,
   accept a changed key), per-partner choice of who may write (everyone or
   chosen people, enforced by the server), the app API and signed federation
@@ -27,6 +28,12 @@
   refused; a removed person's access is not inherited by a new one with the
   same user name; a waiting app is woken by a new partner, and a partner's new
   person reaches another organization's app without the one-minute wait.
+  The admin reset is tested the same way: a code from the instance key lets the
+  admin set a new password and authenticator once, within the hour; expired,
+  altered, malformed, foreign, reused and cross-site attempts are refused, as
+  are a wrong authenticator code and an eleventh try in a minute; the old
+  password, recovery codes and sessions stop working. The Linux install lab
+  runs the command with sudo against the sandboxed service.
   Tests use `*.e2e.test` names, so lab entries in a hosts file cannot collide.
   The app's end-to-end test
   runs two real servers and two engines with libsignal: joining, contacts,
@@ -36,7 +43,8 @@
 - **Sabotage**: each of those checks was switched off in turn and a test
   failed every time, except the sender-domain check on delivery, which the
   device-certificate check already covers. The 17 partner-access and
-  change-notice checks were switched off the same way; each was caught.
+  change-notice checks and the 13 admin-reset checks were switched off the same
+  way; each was caught.
 
 ## Not yet
 

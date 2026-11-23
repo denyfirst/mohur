@@ -125,6 +125,17 @@ not see message text, file contents, file names or keys. An organization's
 admin can add a device for their own employee; the employee's partners then see
 the new-device notice, so it cannot happen silently.
 
+## Admin access
+
+An admin signs in with a password (Argon2id) and an authenticator code, or a
+one-time recovery code instead of the authenticator. When both are lost, the
+server's operator runs `mohurd reset-admin`. It reads only the instance key
+and prints a code: six random bytes and a 72-bit HMAC-SHA256 tag over them and
+the current minute, keyed from the instance key. The running server accepts it
+for an hour, once, at ten tries a minute, and only to set a new password,
+authenticator and recovery codes. Whoever can read the instance key can
+already open every sealed secret, so the code gives the operator nothing new.
+
 ## Out of scope for the first version
 
 Groups, calls, guests, reactions, previews, history transfer, cloud backup,
