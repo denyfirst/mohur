@@ -29,8 +29,8 @@
 
 ## Not yet
 
-- Installing on Linux (`install.sh`, systemd, automatic certificates) and a
-  test on two separate machines with real domains.
+- A test on two separate machines (the install script and its Linux lab are
+  done; see [INSTALL.md](INSTALL.md)), automatic certificates, and real domains.
 - Signed app installers and updates.
 - New signed prekeys over time (the first ones are kept), and a server-side
   retry queue for an unreachable partner (the app retries today).
