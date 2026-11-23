@@ -109,7 +109,8 @@ jobs:
       - name: Install, set up, upgrade and check the sandbox
         run: |
           set -eu
-          export GOTOOLCHAIN="go$(sed -n 's/^go //p' go.mod)"
+          GOTOOLCHAIN="go$(sed -n 's/^go //p' go.mod)"
+          export GOTOOLCHAIN
           sh scripts/install-lab.sh
 
   analysis:
