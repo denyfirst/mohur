@@ -80,6 +80,11 @@ jobs:
         run: |
           set -eu
           test "$(node --version)" = v26.13.1
+          # The app window and the admin pages run only in a browser, so no
+          # test loads them: check that each script at least parses.
+          git ls-files 'client/src/*.mjs' 'client/src/*.cjs' 'web/*.mjs' | while read -r script; do
+            node --check "${script}" || exit 1
+          done
           cd client
           npm ci --ignore-scripts --no-fund
           npm audit --audit-level=high

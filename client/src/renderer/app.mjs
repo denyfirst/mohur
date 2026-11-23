@@ -73,7 +73,7 @@ function drawPeople() {
     }
   }
   if (!people.length) {
-    list.append(el('p', { class: 'empty-list' }, q ? 'No one matches.' : 'No one to write to yet. Colleagues appear here when they join, and a partner's people once your admin lets you write to them.'));
+    list.append(el('p', { class: 'empty-list' }, q ? 'No one matches.' : "No one to write to yet. Colleagues appear here when they join, and a partner's people once your admin lets you write to them."));
   }
 }
 
