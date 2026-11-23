@@ -47,12 +47,15 @@ bin=/usr/local/bin/mohurd
 test "$(id -u)" = 0 || refuse 'run as root'
 test "$(uname -sm)" = 'Linux x86_64' || refuse 'Linux x86-64 only'
 test "$(cat /proc/1/comm)" = systemd || refuse 'systemd must be PID 1'
-for tool in systemctl journalctl getent useradd install head sha256sum; do
+for tool in systemctl journalctl getent useradd install head od sha256sum; do
   command -v "${tool}" >/dev/null 2>&1 || refuse "missing ${tool}"
 done
 test -n "${binary}" || refuse 'give --binary=PATH'
 test -f "${binary}" || refuse "${binary} is not a file"
-"${binary}" -h 2>&1 | grep -q -- '-instance-key' || refuse "${binary} is not mohurd"
+# Checked without running it: a copied file often has no execute bit, and
+# running an unchecked file as root is what this step exists to avoid.
+test "$(head -c 4 "${binary}" | od -An -tx1 | tr -d ' \n')" = 7f454c46 || refuse "${binary} is not mohurd (not a Linux program)"
+grep -q 'mohur/org/v1' "${binary}" || refuse "${binary} is not mohurd"
 
 upgrade=no
 had_data=no
@@ -181,7 +184,7 @@ mv "${unit}.new" "${unit}"
 
 say 'Starting mohurd'
 systemctl daemon-reload
-systemctl enable --now mohurd.service >/dev/null
+systemctl enable --now mohurd.service >/dev/null 2>&1
 code=''
 for _ in 1 2 3 4 5 6 7 8 9 10; do
   sleep 1

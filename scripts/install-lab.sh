@@ -17,6 +17,8 @@ expect_refusal() {
 
 cd "${root}"
 go build -trimpath -o "${work}/mohurd" ./cmd/mohurd
+# Operators copy the binary with scp, which drops the execute bit; install that way.
+chmod 0644 "${work}/mohurd"
 openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -days 2 -subj /CN=mohur.ci.test \
   -addext subjectAltName=DNS:mohur.ci.test -keyout "${work}/key.pem" -out "${work}/cert.pem" 2>/dev/null
 printf '#!/bin/sh\necho not mohurd\n' > "${work}/fake"
@@ -25,6 +27,7 @@ chmod 755 "${work}/fake"
 echo '--- refusals before any change'
 expect_refusal 'give --binary' --server=mohur.ci.test
 expect_refusal 'is not mohurd' --binary="${work}/fake" --server=mohur.ci.test --tls-cert="${work}/cert.pem" --tls-key="${work}/key.pem"
+expect_refusal 'is not mohurd' --binary=/bin/true --server=mohur.ci.test --tls-cert="${work}/cert.pem" --tls-key="${work}/key.pem"
 expect_refusal 'give --server' --binary="${work}/mohurd" --tls-cert="${work}/cert.pem" --tls-key="${work}/key.pem"
 expect_refusal 'give --tls-cert' --binary="${work}/mohurd" --server=mohur.ci.test
 expect_refusal 'holds no PEM private key' --binary="${work}/mohurd" --server=mohur.ci.test --tls-cert="${work}/cert.pem" --tls-key="${work}/cert.pem"
