@@ -34,51 +34,103 @@ type Connection struct {
 	NewName   string `json:"newName,omitempty"`
 	NewServer string `json:"newServer,omitempty"`
 	Checked   int64  `json:"checked"`
-	// Chosen limits who here may write with this partner to the usernames in
-	// People. Without it, everyone here may. Each side decides only for its
-	// own people; the partner never sees this list, only its result.
-	Chosen bool     `json:"chosen,omitempty"`
+	// People are the usernames here who may write with this partner. No one
+	// may until an admin chooses them, so a new person is never shown to a
+	// partner by surprise. Each side decides only for its own people; the
+	// partner never sees this list, only its result.
 	People []string `json:"people,omitempty"`
 }
 
 // Allows reports whether the person here with this username may write with
 // this partner and be written to by its people.
 func (c Connection) Allows(username string) bool {
-	return !c.Chosen || slices.Contains(c.People, username)
+	return slices.Contains(c.People, username)
 }
 
 // MaxChosen bounds the people chosen for one partner.
 const MaxChosen = 10000
 
-// SetAccess sets who here may write with a partner: everyone, or only the
-// chosen people, who must be people of this organization.
-func (s *Store) SetAccess(domain string, chosen bool, people []string) (Connection, error) {
+// SetAccess sets who here may write with a partner: the chosen people, who
+// must be people of this organization. An empty list means no one.
+func (s *Store) SetAccess(domain string, people []string) (Connection, error) {
+	if len(people) > MaxChosen {
+		return Connection{}, ErrRefused
+	}
 	var c Connection
 	err := s.db.Update(func(tx *bolt.Tx) error {
 		var err error
 		if c, err = get[Connection](tx, bucketConnections, domain); err != nil {
 			return err
 		}
-		var list []string
-		if chosen {
-			if len(people) > MaxChosen {
+		list := []string{}
+		for _, u := range people {
+			if tx.Bucket(bucketPeople).Get([]byte(u)) == nil {
 				return ErrRefused
 			}
-			list = []string{}
-			for _, u := range people {
-				if tx.Bucket(bucketPeople).Get([]byte(u)) == nil {
-					return ErrRefused
-				}
-				if !slices.Contains(list, u) {
-					list = append(list, u)
-				}
+			if !slices.Contains(list, u) {
+				list = append(list, u)
 			}
-			slices.Sort(list)
 		}
-		c.Chosen, c.People, c.Updated = chosen, list, s.now().Unix()
+		slices.Sort(list)
+		c.People = list
 		return put(tx, bucketConnections, domain, c)
 	})
 	return c, err
+}
+
+// SetPartners sets which partners one person here may write with: they are
+// added to the chosen people of each partner named and taken off every other.
+// It returns the domains whose lists changed. Unknown people or partners
+// change nothing.
+func (s *Store) SetPartners(username string, domains []string) ([]string, error) {
+	var changed []string
+	err := s.db.Update(func(tx *bolt.Tx) error {
+		if tx.Bucket(bucketPeople).Get([]byte(username)) == nil {
+			return ErrNotFound
+		}
+		b := tx.Bucket(bucketConnections)
+		for _, d := range domains {
+			if b.Get([]byte(d)) == nil {
+				return ErrRefused
+			}
+		}
+		var updates []Connection
+		err := b.ForEach(func(_, v []byte) error {
+			var c Connection
+			if err := json.Unmarshal(v, &c); err != nil {
+				return err
+			}
+			want, has := slices.Contains(domains, c.Domain), slices.Contains(c.People, username)
+			switch {
+			case want && !has:
+				if len(c.People) >= MaxChosen {
+					return ErrRefused
+				}
+				c.People = append(c.People, username)
+				slices.Sort(c.People)
+			case !want && has:
+				c.People = slices.DeleteFunc(c.People, func(u string) bool { return u == username })
+			default:
+				return nil
+			}
+			updates = append(updates, c)
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		for _, c := range updates {
+			if err := put(tx, bucketConnections, c.Domain, c); err != nil {
+				return err
+			}
+			changed = append(changed, c.Domain)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return changed, nil
 }
 
 // forgetAccess takes a removed person off every partner's chosen list, so a

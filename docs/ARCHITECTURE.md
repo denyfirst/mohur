@@ -54,10 +54,12 @@ server.
 ## Who can write to whom
 
 Colleagues in one organization always see and can write to each other; that
-needs nothing beyond their invites. For each partner, an admin chooses who on
-their own side may write with it: **Everyone** (the default, which includes
-people invited later) or **only the people they choose**. Each side decides
-only for its own people, so two people can write to each other only when both
+needs nothing beyond their invites. With a partner, no one may write until an
+admin chooses who on their own side may, so a new person is never shown to a
+partner by surprise. The admin chooses in the same list from two places: per
+partner (asked right after Connect or Accept, changeable any time) and per
+person (on the People page, or in the invite itself). Each side decides only
+for its own people, so two people can write to each other only when both
 admins allow it.
 
 The server enforces the choice, not the app. A partner receives only the
