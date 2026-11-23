@@ -345,6 +345,10 @@ export class Engine extends EventEmitter {
       people.push({ address: p.address, name: p.name, domain: parseAddress(p.address).domain });
     }
     d.people = people;
+    // The server's directory version as of this list; a newer one in the
+    // mail means people or partners changed, and the list is read again.
+    this.directory = res.directory;
+    this.directoryChanged = false;
     await this.vault.save();
     this.changed();
   }
@@ -399,15 +403,28 @@ export class Engine extends EventEmitter {
     }
   }
 
+  // #settle records how a send ended. A refusal (such as an admin's choice
+  // that this person may not write there) leaves the message as not sent,
+  // not as sending forever, and the window shows the reason.
+  async #settle(msg, sending) {
+    try {
+      msg.status = await sending;
+    } catch (e) {
+      msg.status = 'failed';
+      throw e;
+    } finally {
+      await this.vault.save();
+      this.changed();
+    }
+  }
+
   sendText(to, text) {
     return this.serial(async () => {
       text = String(text || '').trim();
       if (!text || text.length > 20000) throw new Error('Messages can be up to 20,000 characters.');
       const msg = { id: newId(), dir: 'out', kind: 'text', text, at: Date.now(), status: 'sending' };
       this.#store(to, msg);
-      msg.status = await this.#sendPayload(to, { v: 1, kind: 'text', id: msg.id, text, at: msg.at });
-      await this.vault.save();
-      this.changed();
+      await this.#settle(msg, this.#sendPayload(to, { v: 1, kind: 'text', id: msg.id, text, at: msg.at }));
       return msg.id;
     });
   }
@@ -425,9 +442,7 @@ export class Engine extends EventEmitter {
       const file = { blob, name: String(name).slice(0, 255), type: String(type || 'application/octet-stream').slice(0, 127), size: data.length, key: b64(key), iv: b64(iv), sha256 };
       const msg = { id: newId(), dir: 'out', kind: 'file', file, at: Date.now(), status: 'sending' };
       this.#store(to, msg);
-      msg.status = await this.#sendPayload(to, { v: 1, kind: 'file', id: msg.id, file, at: msg.at }, [blob]);
-      await this.vault.save();
-      this.changed();
+      await this.#settle(msg, this.#sendPayload(to, { v: 1, kind: 'file', id: msg.id, file, at: msg.at }, [blob]));
       return msg.id;
     });
   }
@@ -548,6 +563,7 @@ export class Engine extends EventEmitter {
   // pollOnce fetches and opens waiting messages; wait makes it a long poll.
   pollOnce(wait = false) {
     return this.api('GET', '/api/v1/inbox' + (wait ? '?wait=1' : ''), { timeout: 45000 }).then((res) => {
+      if (res.directory !== undefined && this.directory !== undefined && res.directory !== this.directory) this.directoryChanged = true;
       if (!res.envelopes.length) return 0;
       return this.serial(() => this.#receive(res.envelopes)).then(() => res.envelopes.length);
     });
@@ -572,7 +588,7 @@ export class Engine extends EventEmitter {
       let lastSync = 0;
       while (this.running) {
         try {
-          if (Date.now() - lastSync > 60000) {
+          if (this.directoryChanged || Date.now() - lastSync > 60000) {
             await this.serial(() => this.syncContacts());
             await this.#replenish();
             lastSync = Date.now();

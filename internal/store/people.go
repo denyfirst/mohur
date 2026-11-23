@@ -182,7 +182,8 @@ func (s *Store) People() ([]Person, error) {
 	return out, err
 }
 
-// Remove deletes a person, their device, invites and queued messages.
+// Remove deletes a person, their device, invites, queued messages and their
+// place on partners' chosen lists.
 func (s *Store) Remove(username string) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		if tx.Bucket(bucketPeople).Get([]byte(username)) == nil {
@@ -195,6 +196,9 @@ func (s *Store) Remove(username string) error {
 			if err := q.DeleteBucket([]byte(username)); err != nil {
 				return err
 			}
+		}
+		if err := forgetAccess(tx, username); err != nil {
+			return err
 		}
 		return tx.Bucket(bucketPeople).Delete([]byte(username))
 	})

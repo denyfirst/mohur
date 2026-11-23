@@ -111,14 +111,14 @@
   </main>
 
   <main class="page" id="page-people" hidden>
-    <header class="page-head with-action"><div><p class="eyebrow">People</p><h1>People</h1><p class="hint">Everyone here can write to everyone in your partner organizations.</p></div><button type="button" id="invite-open">Invite someone</button></header>
+    <header class="page-head with-action"><div><p class="eyebrow">People</p><h1 id="people-title">People</h1><p class="hint">Your organization's people. They can all write to each other. Who can write to each partner is chosen on the Partners page.</p></div><button type="button" id="invite-open">Invite someone</button></header>
     <ul class="rows" id="people-list"></ul>
     <p class="empty" id="people-empty" hidden>No one yet. Invite the first person.</p>
     <p class="notice" role="status" data-notice></p>
   </main>
 
   <main class="page" id="page-partners" hidden>
-    <header class="page-head with-action"><div><p class="eyebrow">Partners</p><h1>Partners</h1><p class="hint">Organizations your people can write to. Each one is verified by its domain.</p></div><button type="button" id="connect-open">Connect a partner</button></header>
+    <header class="page-head with-action"><div><p class="eyebrow">Partners</p><h1>Partners</h1><p class="hint">Other organizations, each verified by its domain. Each side chooses which of its own people can write to the other: you choose for yours, they choose for theirs.</p></div><button type="button" id="connect-open">Connect a partner</button></header>
     <ul class="rows" id="partner-list"></ul>
     <p class="empty" id="partner-empty" hidden>No partners yet. Connect one by its domain.</p>
     <p class="notice" role="status" data-notice></p>
@@ -168,6 +168,20 @@
     </div>
     <p class="notice" role="status" data-dialog-notice></p>
     <div class="actions"><button type="button" class="secondary" data-close>Cancel</button><button type="submit" id="connect-submit">Check</button></div>
+  </form>
+</dialog>
+
+<dialog id="access-dialog" aria-labelledby="access-title">
+  <form id="access-form" method="dialog">
+    <h2 id="access-title"></h2>
+    <p class="hint">Only these people see the partner's people and can write to them. The partner sees only them, and this server refuses anything to or from anyone else here.</p>
+    <fieldset class="choice" aria-label="Who can write">
+      <label class="option"><input type="radio" name="who" value="everyone"><span><strong>Everyone</strong><span class="sub" id="access-everyone-sub"></span></span></label>
+      <label class="option"><input type="radio" name="who" value="chosen"><span><strong>Only the people I choose</strong><span class="sub">People you invite later are not included until you tick them.</span></span></label>
+    </fieldset>
+    <ul class="pick" id="access-people"></ul>
+    <p class="notice" role="status" data-dialog-notice></p>
+    <div class="actions"><button type="button" class="secondary" data-close>Cancel</button><button type="submit">Save</button></div>
   </form>
 </dialog>
 
