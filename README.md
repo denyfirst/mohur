@@ -29,6 +29,7 @@ Where it stands: [docs/STATUS.md](docs/STATUS.md).
 | `cmd/mohurd` | The server: one Go binary with the admin pages, the app API and federation |
 | `cmd/mohur-lab` | Two or more organizations on one computer, for development and tests |
 | `client/` | The desktop app: Electron and libsignal |
+| `scripts/install.sh` | Installs or upgrades `mohurd` on Linux: [docs/INSTALL.md](docs/INSTALL.md) |
 | `web/` | The admin pages, built into `mohurd` |
 
 ## Run the checks
