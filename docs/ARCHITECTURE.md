@@ -74,7 +74,15 @@ changes its key, or an admin changes who may write. A change wakes every
 waiting app, which then reads its contacts again. A server also sends its
 connected partners a signed `POST /fed/v1/changed` when its own people change,
 so their apps update too; without it, a partner's people are read again every
-minute.
+minute. The app also reads its contacts when its window comes to the front and
+they are older than 15 seconds, and its Refresh button asks the server to read
+partners' lists afresh. A server honours that for one person six times a
+minute; beyond that the cached lists answer, so no app can make its server call
+partners without limit.
+
+The app keeps, in its encrypted vault, how far each conversation was read and
+shows the rest as unread, in the list and in the window title. Messages that
+were in a vault before the app counted them are taken as read.
 
 ## Changed keys
 

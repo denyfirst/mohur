@@ -14,5 +14,6 @@ contextBridge.exposeInMainWorld('mohur', {
   sendFile: (to) => call('send-file', { to: String(to) }),
   saveFile: (address, id) => call('save-file', { address: String(address), id: String(id) }),
   refresh: () => call('refresh'),
+  read: (address) => call('read', String(address)),
   onUpdate: (cb) => { ipcRenderer.on('update', () => cb()); },
 });

@@ -10,56 +10,78 @@
 </head>
 <body data-loading>
 
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M19.5 11A7.5 7.5 0 0 0 6.2 6.6L4.5 8.3"/><path d="M4.5 4.5v3.8h3.8"/><path d="M4.5 13a7.5 7.5 0 0 0 13.3 4.4l1.7-1.7"/><path d="M19.5 19.5v-3.8h-3.8"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></symbol>
+    <symbol id="i-verified" viewBox="0 0 24 24"><path d="M12 2.5 14.2 4l2.7-.2 1.1 2.4 2.4 1.1-.2 2.7L21.5 12 20 14.2l.2 2.7-2.4 1.1-1.1 2.4-2.7-.2L12 21.5 9.8 20l-2.7.2-1.1-2.4-2.4-1.1.2-2.7L2.5 12 4 9.8l-.2-2.7 2.4-1.1 1.1-2.4 2.7.2z"/><path d="m8.5 12.2 2.3 2.3 4.7-4.9"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-checks" viewBox="0 0 24 24"><path d="m1.5 12.5 4.5 4.5 9.5-9.5"/><path d="m11 16.5.5.5 9.5-9.5"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4.5l3 1.5"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5.5"/><path d="M12 16.5h.01"/></symbol>
+    <symbol id="i-clip" viewBox="0 0 24 24"><path d="m20 11.5-8.2 8.2a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M4.5 12 20 4.5 15 20l-3-6.5z"/><path d="m12 13.5 3.5-3.5"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></symbol>
+  </defs>
+</svg>
+
 <main class="join" id="join" hidden>
   <div class="join-card">
-    <p class="mark"><span class="wordmark">mohur<span class="stop">.</span></span></p>
+    <p class="brand"><span class="wordmark">mohur<span class="stop">.</span></span></p>
     <h1>Join your organization</h1>
     <p class="hint">Mohur on this computer is for one person: you. Paste the invite your admin sent you. It looks like <span class="mono">company.com/ABCD-EFGH-…</span></p>
     <form id="join-form">
       <label for="join-invite">Invite</label>
       <input id="join-invite" autocomplete="off" spellcheck="false" required>
       <div class="verified" id="join-found" hidden>
-        <svg class="seal" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 14.2 4l2.7-.2 1.1 2.4 2.4 1.1-.2 2.7L21.5 12 20 14.2l.2 2.7-2.4 1.1-1.1 2.4-2.7-.2L12 21.5 9.8 20l-2.7.2-1.1-2.4-2.4-1.1.2-2.7L2.5 12 4 9.8l-.2-2.7 2.4-1.1 1.1-2.4 2.7.2z"/><path d="m8.5 12.2 2.3 2.3 4.7-4.9"/></svg>
+        <svg class="i seal" aria-hidden="true"><use href="#i-verified"/></svg>
         <div><strong id="join-org"></strong><span class="sub" id="join-domain"></span><span class="sub">Verified by its domain record and certificate.</span></div>
       </div>
       <p class="notice" id="join-notice" role="status"></p>
       <button type="submit" id="join-submit">Check invite</button>
     </form>
-    <p class="fine">Your keys are made on this computer and never leave it.</p>
+    <p class="fine lock-line"><svg class="i" aria-hidden="true"><use href="#i-lock"/></svg>Your keys are made on this computer and never leave it.</p>
   </div>
 </main>
 
 <div class="app" id="app" hidden>
   <aside class="side">
-    <header class="me">
-      <span class="wordmark small">mohur<span class="stop">.</span></span>
-      <div class="me-who"><strong id="me-name"></strong><span class="sub" id="me-org"></span></div>
+    <header class="side-head">
+      <p class="brand"><span class="wordmark">mohur<span class="stop">.</span></span></p>
+      <button type="button" class="icon-button" id="refresh" title="Refresh the list" aria-label="Refresh the list"><svg class="i" aria-hidden="true"><use href="#i-refresh"/></svg></button>
     </header>
-    <label class="search"><span class="visually-hidden">Search people</span><input id="search" type="search" placeholder="Search people" autocomplete="off"></label>
+    <label class="search"><svg class="i" aria-hidden="true"><use href="#i-search"/></svg><span class="visually-hidden">Search people</span><input id="search" type="search" placeholder="Search people" autocomplete="off"></label>
+    <p class="toast" id="toast" role="status" hidden></p>
     <nav class="people" id="people" aria-label="People"></nav>
-    <footer class="side-foot">
-      <span class="status" id="status"><span class="dot"></span><span id="status-text"></span></span>
-      <span class="fine">Encrypted end to end. Servers cannot read your messages.</span>
+    <footer class="me">
+      <span class="avatar" id="me-avatar" aria-hidden="true"></span>
+      <div class="me-who"><strong id="me-name"></strong><span class="sub" id="me-org"></span></div>
+      <span class="status" id="status" title=""><span class="dot"></span><span id="status-text"></span></span>
     </footer>
   </aside>
 
   <section class="conv" id="conv">
     <div class="conv-empty" id="conv-empty">
-      <svg class="seal big" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 14.2 4l2.7-.2 1.1 2.4 2.4 1.1-.2 2.7L21.5 12 20 14.2l.2 2.7-2.4 1.1-1.1 2.4-2.7-.2L12 21.5 9.8 20l-2.7.2-1.1-2.4-2.4-1.1.2-2.7L2.5 12 4 9.8l-.2-2.7 2.4-1.1 1.1-2.4 2.7.2z"/><path d="m8.5 12.2 2.3 2.3 4.7-4.9"/></svg>
-      <p><strong>Choose someone to write to.</strong></p>
-      <p class="sub">Everyone in the list is verified by their organization.</p>
+      <svg class="i seal big" aria-hidden="true"><use href="#i-verified"/></svg>
+      <p class="title">Choose someone to write to.</p>
+      <p class="sub-text">Everyone in the list is verified by their organization.</p>
+      <p class="lock-line"><svg class="i" aria-hidden="true"><use href="#i-lock"/></svg>Encrypted end to end. Servers cannot read your messages.</p>
     </div>
     <header class="conv-head" id="conv-head" hidden>
       <span class="avatar" id="conv-avatar" aria-hidden="true"></span>
       <div class="conv-who"><strong id="conv-name"></strong><span class="sub" id="conv-addr"></span></div>
-      <span class="chip" id="conv-chip"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 12.5 3 3 7-7"/></svg><span id="conv-chip-text"></span></span>
+      <span class="chip" id="conv-chip"><svg class="i" aria-hidden="true"><use href="#i-verified"/></svg><span id="conv-chip-text"></span></span>
     </header>
     <ol class="messages" id="messages" aria-live="polite" hidden></ol>
     <form class="composer" id="composer" hidden>
-      <button type="button" class="icon" id="attach" title="Send a file" aria-label="Send a file"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m20 11.5-8.2 8.2a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8"/></svg></button>
-      <label class="visually-hidden" for="text">Message</label>
-      <textarea id="text" rows="1" placeholder="Write a message" maxlength="20000"></textarea>
-      <button type="submit" class="send" id="send" aria-label="Send"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12 20 4l-6 16-2.5-6.5z"/><path d="m11.5 13.5 3-3"/></svg></button>
+      <div class="composer-box">
+        <button type="button" class="icon-button" id="attach" title="Send a file" aria-label="Send a file"><svg class="i" aria-hidden="true"><use href="#i-clip"/></svg></button>
+        <label class="visually-hidden" for="text">Message</label>
+        <textarea id="text" rows="1" placeholder="Write a message" maxlength="20000"></textarea>
+        <button type="submit" class="send" id="send" aria-label="Send" title="Send" disabled><svg class="i" aria-hidden="true"><use href="#i-send"/></svg></button>
+      </div>
+      <p class="composer-hint">Enter sends · Shift+Enter starts a new line</p>
     </form>
   </section>
 </div>

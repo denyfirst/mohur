@@ -2,9 +2,11 @@
   mohur, by denyfirst
   -------------------
   The Denyfirst family: one typeface served from this server, quiet surfaces in
-  light and dark, one colour per product. Mohur's is seal blue, the ink of an
-  official stamp. Green, amber and red only ever say whether something is
-  verified, waiting or wrong; no control is drawn in a verdict colour.
+  light and dark, one colour per product. Mohur's is seal gold, after the
+  stamp and the gold coin it is named for. Green, orange and red only ever say
+  whether something is verified, waiting or wrong (orange, not the family's
+  amber, so waiting never looks like Mohur); no control is drawn in a verdict
+  colour.
   Fixed sizes: type 12/14/16/18/24/32, space 4 to 64, radius 6/10/16,
   controls 44 px high, rail 248 px, content up to 1120 px.
 */
@@ -25,12 +27,14 @@
   --ink-faint: #5a6172;
   --rule: #e1e5eb;
   --brand: #c42b3a;
-  --tool: #2449c8;
-  --link: #2143b5;
-  --accent: #2449c8;
-  --accent-hover: #1c3aa6;
+  --tool: #8a5a00;
+  --stop: #d99a2b;
+  --link: #845600;
+  --accent: #e5a83a;
+  --accent-hover: #d99a2b;
+  --accent-ink: #1d1404;
   --good: #1f6a44;
-  --warn: #845900;
+  --warn: #b54708;
   --bad: #b3202e;
   --sans: "Schibsted Grotesk", "Segoe UI Variable Text", "Segoe UI", ui-sans-serif, system-ui, -apple-system, Roboto, Arial, sans-serif;
   --mono: ui-monospace, "Cascadia Mono", "SF Mono", "Roboto Mono", Menlo, Consolas, monospace;
@@ -51,12 +55,14 @@
     --ink-faint: #949cad;
     --rule: #242a35;
     --brand: #ed4552;
-    --tool: #8ea6ff;
-    --link: #8ea6ff;
-    --accent: #2f55d4;
-    --accent-hover: #3a61e0;
+    --tool: #f2b544;
+    --stop: #f2b544;
+    --link: #f2b544;
+    --accent: #e0a032;
+    --accent-hover: #eaae45;
+    --accent-ink: #1d1404;
     --good: #6fbf92;
-    --warn: #d9a23c;
+    --warn: #f59e5b;
     --bad: #ff7c86;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 2px 10px rgba(0, 0, 0, 0.3);
     --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.6);
@@ -91,7 +97,7 @@ p { margin: 0 0 12px; }
 .eyebrow { margin: 0 0 6px; font-size: 12px; font-weight: 650; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); }
 
 .wordmark { font-size: 28px; font-weight: 750; letter-spacing: -0.04em; line-height: 1; color: var(--ink); text-decoration: none; }
-.wordmark-stop { color: var(--tool); }
+.wordmark-stop { color: var(--stop); }
 .brand-stop { color: var(--brand); }
 .org { font-weight: 700; letter-spacing: -0.02em; }
 
@@ -107,7 +113,7 @@ input::placeholder { color: var(--ink-faint); }
 button {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   min-height: 44px; margin-top: 24px; padding: 0 18px;
-  font: inherit; font-size: 15px; font-weight: 650; color: #fff;
+  font: inherit; font-size: 15px; font-weight: 650; color: var(--accent-ink);
   background: var(--accent); border: 1px solid var(--accent); border-radius: var(--r-m);
   cursor: pointer; transition: background-color 0.15s, border-color 0.15s;
 }
@@ -174,7 +180,7 @@ output.codes { columns: 2; column-gap: 24px; font-size: 16px; line-height: 2; }
 .rail-item[aria-current="page"] { color: var(--ink); background: color-mix(in srgb, var(--tool) 10%, var(--paper)); border-color: color-mix(in srgb, var(--tool) 35%, var(--rule)); }
 .glyph { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; color: var(--ink-faint); }
 .rail-item[aria-current="page"] .glyph { color: var(--tool); }
-.count { margin-left: auto; min-width: 22px; padding: 0 6px; font-size: 12px; font-weight: 700; line-height: 22px; text-align: center; color: #fff; background: var(--accent); border-radius: 999px; }
+.count { margin-left: auto; min-width: 22px; padding: 0 6px; font-size: 12px; font-weight: 700; line-height: 22px; text-align: center; color: var(--accent-ink); background: var(--accent); border-radius: 999px; }
 .dot-warn { margin-left: auto; width: 8px; height: 8px; border-radius: 50%; background: var(--warn); }
 .rail-foot { margin-top: auto; padding: 16px 12px 0; border-top: 1px solid var(--rule); }
 .who { margin: 0; font-weight: 650; }
