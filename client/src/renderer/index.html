@@ -44,6 +44,7 @@
       <p class="notice" id="join-notice" role="status"></p>
       <button type="submit" id="join-submit">Check invite</button>
     </form>
+    <p class="fine terms-line">By joining, you accept Mohur's <button type="button" class="link" data-policy="terms">terms of use</button>. <button type="button" class="link" data-policy="privacy">Privacy</button> says what is kept, and where.</p>
     <p class="fine lock-line"><svg class="i" aria-hidden="true"><use href="#i-lock"/></svg>Your keys are made on this computer and never leave it.</p>
   </div>
 </main>
@@ -70,6 +71,7 @@
       <p class="title">Choose someone to write to.</p>
       <p class="sub-text">Everyone in the list is verified by their organization.</p>
       <p class="lock-line"><svg class="i" aria-hidden="true"><use href="#i-lock"/></svg>Encrypted end to end. Servers cannot read your messages.</p>
+      <p class="policy-links"><button type="button" class="link" data-policy="privacy">Privacy</button><span aria-hidden="true">·</span><button type="button" class="link" data-policy="terms">Terms of use</button></p>
     </div>
     <header class="conv-head" id="conv-head" hidden>
       <span class="avatar" id="conv-avatar" aria-hidden="true"></span>
@@ -114,6 +116,11 @@
     <p class="notice" id="report-notice" role="status"></p>
     <div class="sheet-actions"><button type="button" class="secondary" id="report-cancel">Cancel</button><button type="submit" id="report-send">Send report</button></div>
   </form>
+</dialog>
+
+<dialog class="sheet policy" id="policy-dialog" aria-labelledby="policy-title">
+  <article class="policy-body" id="policy-body"></article>
+  <div class="sheet-actions"><button type="button" id="policy-close">Close</button></div>
 </dialog>
 
 </body>

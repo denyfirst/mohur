@@ -18,5 +18,6 @@ contextBridge.exposeInMainWorld('mohur', {
   block: (address) => call('block', String(address)),
   unblock: (address) => call('unblock', String(address)),
   report: (address, reason, note) => call('report', { address: String(address), reason: String(reason), note: String(note || '') }),
+  policy: (name) => call('policy', String(name)),
   onUpdate: (cb) => { ipcRenderer.on('update', () => cb()); },
 });
