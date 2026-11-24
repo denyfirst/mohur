@@ -32,6 +32,11 @@ Windows 10 1809 or later. electron-builder uses its current Windows SDK tools
 (`toolsets.winCodeSign: 1.1.0`, SDK 10.0.26100, checksums pinned inside
 electron-builder). The default older bundle cannot sign MSIX on Windows 11.
 
+`package.json` lifts the build tools' copies of `minimatch` from 7.x–11.0.0
+to 11.0.5, which fixes a denial of service through crafted glob patterns. The
+older 3.x and 5.x copies are not affected and stay as they are. With the
+change, the package's file list did not change by a single file.
+
 ## Trying a build before the Store
 
 Windows installs only signed packages. To test locally:
