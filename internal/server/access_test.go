@@ -435,9 +435,10 @@ func TestFreshContactReadsAreLimitedPerPerson(t *testing.T) {
 	kamran := beta.join(beta.inviteFor("kamran", "Kamran", "alpha.e2e.test"), 200)
 
 	start := time.Now()
+	clock := &testClock{t: start}
 	now := start
-	alpha.srv.SetClock(func() time.Time { return now })
-	alpha.st.SetClock(func() time.Time { return now })
+	alpha.srv.SetClock(clock.Now)
+	alpha.st.SetClock(clock.Now)
 	defer alpha.srv.SetClock(time.Now)
 	defer alpha.st.SetClock(time.Now)
 	// fetched is when Alpha last read Beta's list from Beta itself.
@@ -458,14 +459,14 @@ func TestFreshContactReadsAreLimitedPerPerson(t *testing.T) {
 
 	// Each Refresh reads Beta again, up to the limit.
 	for i := 0; i < freshPerMinute; i++ {
-		now = now.Add(time.Second)
+		now = clock.Add(time.Second)
 		read(aylin, true)
 		if fetched() != now.Unix() {
 			t.Fatalf("fresh read %d was answered from the cache", i+1)
 		}
 	}
 	// One more within the minute is answered from the cache, as is a plain read.
-	now = now.Add(time.Second)
+	now = clock.Add(time.Second)
 	read(aylin, true)
 	read(aylin, false)
 	if fetched() == now.Unix() {
@@ -478,13 +479,13 @@ func TestFreshContactReadsAreLimitedPerPerson(t *testing.T) {
 	}
 	// A minute after Aylin's first Refresh she may refresh again, while the
 	// cache alone would still be used.
-	now = start.Add(time.Minute + time.Second)
+	now = clock.Set(start.Add(time.Minute + time.Second))
 	read(aylin, true)
 	if fetched() != now.Unix() {
 		t.Fatal("refresh stayed off after the minute")
 	}
 	// Anything but fresh=1 is a plain read.
-	now = now.Add(time.Second)
+	now = clock.Add(time.Second)
 	var res struct {
 		People []proto.Person `json:"people"`
 	}

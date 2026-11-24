@@ -22,6 +22,9 @@
     <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5.5"/><path d="M12 16.5h.01"/></symbol>
     <symbol id="i-clip" viewBox="0 0 24 24"><path d="m20 11.5-8.2 8.2a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8"/></symbol>
     <symbol id="i-send" viewBox="0 0 24 24"><path d="M4.5 12 20 4.5 15 20l-3-6.5z"/><path d="m12 13.5 3.5-3.5"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="18.5" cy="12" r="1.3"/></symbol>
+    <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/></symbol>
+    <symbol id="i-block" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="m6 6 12 12"/></symbol>
     <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></symbol>
   </defs>
 </svg>
@@ -72,8 +75,16 @@
       <span class="avatar" id="conv-avatar" aria-hidden="true"></span>
       <div class="conv-who"><strong id="conv-name"></strong><span class="sub" id="conv-addr"></span></div>
       <span class="chip" id="conv-chip"><svg class="i" aria-hidden="true"><use href="#i-verified"/></svg><span id="conv-chip-text"></span></span>
+      <div class="more">
+        <button type="button" class="icon-button" id="conv-more" title="More" aria-label="More" aria-haspopup="menu" aria-expanded="false" aria-controls="conv-menu"><svg class="i" aria-hidden="true"><use href="#i-more"/></svg></button>
+        <div class="menu" id="conv-menu" role="menu" hidden>
+          <button type="button" role="menuitem" id="menu-report"><svg class="i" aria-hidden="true"><use href="#i-flag"/></svg><span>Report to your admin…</span></button>
+          <button type="button" role="menuitem" id="menu-block"><svg class="i" aria-hidden="true"><use href="#i-block"/></svg><span id="menu-block-text">Block</span></button>
+        </div>
+      </div>
     </header>
     <ol class="messages" id="messages" aria-live="polite" hidden></ol>
+    <div class="blocked-bar" id="blocked-bar" hidden><svg class="i" aria-hidden="true"><use href="#i-block"/></svg><span id="blocked-text"></span><button type="button" class="secondary" id="unblock">Unblock</button></div>
     <form class="composer" id="composer" hidden>
       <div class="composer-box">
         <button type="button" class="icon-button" id="attach" title="Send a file" aria-label="Send a file"><svg class="i" aria-hidden="true"><use href="#i-clip"/></svg></button>
@@ -85,6 +96,25 @@
     </form>
   </section>
 </div>
+
+<dialog class="sheet" id="report-dialog" aria-labelledby="report-title">
+  <form method="dialog" id="report-form">
+    <h2 id="report-title"></h2>
+    <p class="hint">Your admin sees your name, who you reported, the reason and your note. Your messages stay encrypted between you two and are not sent.</p>
+    <fieldset class="reasons">
+      <legend>Reason</legend>
+      <label><input type="radio" name="reason" value="spam" required> Spam</label>
+      <label><input type="radio" name="reason" value="abuse"> Harassment or abuse</label>
+      <label><input type="radio" name="reason" value="illegal"> Something illegal</label>
+      <label><input type="radio" name="reason" value="other"> Something else</label>
+    </fieldset>
+    <label for="report-note">Note for your admin <span class="optional">(optional)</span></label>
+    <textarea id="report-note" rows="4" maxlength="1000" placeholder="What happened, in your words"></textarea>
+    <label class="check"><input type="checkbox" id="report-block" checked> <span id="report-block-text"></span></label>
+    <p class="notice" id="report-notice" role="status"></p>
+    <div class="sheet-actions"><button type="button" class="secondary" id="report-cancel">Cancel</button><button type="submit" id="report-send">Send report</button></div>
+  </form>
+</dialog>
 
 </body>
 </html>

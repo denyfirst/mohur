@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/denyfirst/mohur/internal/discover"
@@ -25,10 +26,10 @@ import (
 
 // Server serves one organization.
 type Server struct {
-	st   *store.Store
-	disc *discover.Verifier
-	log  *slog.Logger
-	now  func() time.Time
+	st    *store.Store
+	disc  *discover.Verifier
+	log   *slog.Logger
+	clock atomic.Pointer[func() time.Time]
 
 	mu        sync.Mutex
 	admins    map[[32]byte]adminSession
@@ -66,14 +67,18 @@ type window struct {
 
 // New makes a server over an open store.
 func New(st *store.Store, disc *discover.Verifier, log *slog.Logger) *Server {
-	return &Server{st: st, disc: disc, log: log, now: time.Now,
+	s := &Server{st: st, disc: disc, log: log,
 		admins: map[[32]byte]adminSession{}, clients: map[[32]byte]clientSession{},
 		setupSeed: map[[32]byte]string{}, waiters: map[string][]chan struct{}{},
 		limits: map[string]*window{}, nonces: map[string]clientNonce{}, directory: time.Now().Unix()}
+	s.SetClock(time.Now)
+	return s
 }
 
-// SetClock replaces the clock; tests only.
-func (s *Server) SetClock(now func() time.Time) { s.now = now }
+// SetClock replaces the clock; tests only. It is safe while requests run.
+func (s *Server) SetClock(now func() time.Time) { s.clock.Store(&now) }
+
+func (s *Server) now() time.Time { return (*s.clock.Load())() }
 
 // Handler returns the complete HTTP handler.
 func (s *Server) Handler() http.Handler {
@@ -83,7 +88,7 @@ func (s *Server) Handler() http.Handler {
 
 	// Admin pages: one document; the script shows the right view.
 	mux.HandleFunc("GET /{$}", s.page)
-	for _, p := range []string{"/people", "/partners", "/domain", "/signin", "/setup", "/reset"} {
+	for _, p := range []string{"/people", "/partners", "/reports", "/domain", "/signin", "/setup", "/reset"} {
 		mux.HandleFunc("GET "+p, s.page)
 	}
 	mux.Handle("GET /assets/", http.StripPrefix("/assets/", web.Assets()))
@@ -109,6 +114,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /admin/api/partners/remove", s.admin(s.partnersRemove))
 	mux.HandleFunc("POST /admin/api/partners/trust", s.admin(s.partnersTrust))
 	mux.HandleFunc("POST /admin/api/partners/access", s.admin(s.partnersAccess))
+	mux.HandleFunc("GET /admin/api/reports", s.admin(s.reportsList))
+	mux.HandleFunc("POST /admin/api/reports/close", s.admin(s.reportsClose))
 
 	mux.HandleFunc("POST /api/v1/join", s.join)
 	mux.HandleFunc("POST /api/v1/session/challenge", s.sessionChallenge)
@@ -122,6 +129,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/inbox/ack", s.client(s.ack))
 	mux.HandleFunc("POST /api/v1/blobs", s.client(s.blobUpload))
 	mux.HandleFunc("GET /api/v1/blobs/{id}", s.client(s.blobDownload))
+	mux.HandleFunc("POST /api/v1/report", s.client(s.report))
 
 	mux.HandleFunc("POST /fed/v1/connect", s.fedConnect)
 	mux.HandleFunc("POST /fed/v1/accept", s.fed(s.fedAccept))

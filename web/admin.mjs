@@ -68,7 +68,7 @@ function drawQR(svg, rows) {
 
 // ── Views ────────────────────────────────────────────────────────────────
 
-const pages = { '/': 'overview', '/people': 'people', '/partners': 'partners', '/domain': 'domain' };
+const pages = { '/': 'overview', '/people': 'people', '/partners': 'partners', '/reports': 'reports', '/domain': 'domain' };
 
 function showOnly(id) {
   for (const v of ['setup', 'signin', 'reset', 'workspace']) $(v).hidden = v !== id;
@@ -98,6 +98,7 @@ async function load() {
   $('rail-org').textContent = state.org ? `${state.org.name} · ${state.org.domain}` : '';
   $('rail-admin').textContent = state.admin;
   $('rail-domain-warn').hidden = Boolean(state.org && state.org.dnsChecked);
+  openReports(state.openReports || 0);
   await route();
 }
 
@@ -113,6 +114,7 @@ async function route() {
     if (page === 'overview') await overview();
     if (page === 'people') await people();
     if (page === 'partners') await partners();
+    if (page === 'reports') await reports();
     if (page === 'domain') domain();
   } catch (e) {
     notice($('page-' + page), e.message, 'bad');
@@ -267,6 +269,52 @@ async function removePerson(p) {
     await people();
     notice($('page-people'), `${p.name} was removed.`);
   } catch (e) { notice($('page-people'), e.message, 'bad'); }
+}
+
+// ── Reports ──────────────────────────────────────────────────────────────
+
+function openReports(n) {
+  $('rail-reports').hidden = n === 0;
+  $('rail-reports').textContent = n;
+}
+
+async function reports() {
+  const list = await api('reports');
+  openReports(list.filter((r) => !r.closed).length);
+  const ul = $('report-list');
+  ul.replaceChildren();
+  $('report-empty').hidden = list.length > 0;
+  for (const r of list) {
+    const about = r.aboutName ? `${r.aboutName} (${r.about})` : r.about;
+    const where = r.aboutHere ? 'one of your people' : r.aboutOrg ? 'at ' + r.aboutOrg : 'at ' + r.about.split('@')[1];
+    const main = el('div', { class: 'row-main' },
+      el('strong', {}, `${r.fromName} reported ${about}`),
+      el('span', { class: 'sub' }, `${r.reasonText} · ${where} · ${when(r.at)}`));
+    if (r.note) main.append(el('blockquote', { class: 'report-note' }, r.note));
+    main.append(el('span', { class: 'access-line' }, r.aboutHere
+      ? 'You can remove this person on the People page.'
+      : `You can stop your people writing with ${r.aboutOrg || 'this partner'}, or disconnect it, on the Partners page.`));
+    const side = el('div', { class: 'row-side' });
+    if (r.closed) {
+      side.append(pill('Handled', 'good'));
+      main.append(el('span', { class: 'sub' }, `Handled by ${r.closedBy} on ${when(r.closed)}`));
+    } else {
+      side.append(pill('Open', 'warn'));
+      side.append(el('a', { class: 'button secondary small', href: r.aboutHere ? '/people' : '/partners', 'data-link': '' }, r.aboutHere ? 'People' : 'Partners'));
+      side.append(el('button', { type: 'button', class: 'small', onclick: () => closeReport(r) }, 'Mark handled'));
+    }
+    const li = el('li', { class: 'row' }, el('span', { class: 'avatar', 'aria-hidden': 'true' }, '!'), main, side);
+    if (!r.closed) li.dataset.attention = '';
+    ul.append(li);
+  }
+}
+
+async function closeReport(r) {
+  try {
+    await api('reports/close', { id: r.id });
+    await reports();
+    notice($('page-reports'), 'Marked handled.');
+  } catch (e) { notice($('page-reports'), e.message, 'bad'); }
 }
 
 const stateWords = {

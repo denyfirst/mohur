@@ -12,6 +12,8 @@ const PREKEY_BATCH = 100;
 const PREKEY_LOW = 20;
 const MAX_FILE = 100 * 1024 * 1024;
 const FILE_AAD = Buffer.from('mohur/file/v1');
+// The reasons a person can give their admin, as the server knows them.
+const REPORT_REASONS = ['spam', 'abuse', 'illegal', 'other'];
 
 // Plaintexts are padded to 160-byte steps (ISO/IEC 7816-4), so a message's
 // length shows only roughly how long it is.
@@ -366,6 +368,51 @@ export class Engine extends EventEmitter {
     return this.serial(() => this.syncContacts()).then(() => true);
   }
 
+  // ── Blocking and reporting ──
+
+  #blocked(address) {
+    const b = this.vault.data.blocked;
+    return Boolean(b && Object.hasOwn(b, address));
+  }
+
+  #person(address) {
+    if (typeof address !== 'string' || address.length > 300) throw new Error('Choose someone from your list.');
+    parseAddress(address);
+    if (address === this.me.address) throw new Error('That is you.');
+  }
+
+  // block stops showing a person's messages on this computer. Their
+  // messages are still opened, so the conversation keys stay in step, but
+  // they are not kept and get no delivery receipt. They are not told.
+  block(address) {
+    return this.serial(async () => {
+      this.#person(address);
+      (this.vault.data.blocked ||= {})[address] = Date.now();
+      await this.vault.save();
+      this.changed();
+    });
+  }
+
+  unblock(address) {
+    return this.serial(async () => {
+      this.#person(address);
+      if (this.vault.data.blocked) delete this.vault.data.blocked[address];
+      await this.vault.save();
+      this.changed();
+    });
+  }
+
+  // report tells this person's own admin about someone, with a reason and
+  // the person's own note. No message is sent with it: messages stay
+  // encrypted between the two people.
+  async report(address, reason, note = '') {
+    this.#person(address);
+    if (!REPORT_REASONS.includes(reason)) throw new Error('Choose a reason.');
+    note = String(note || '').trim();
+    if ([...note].length > 1000) throw new Error('The note can be up to 1,000 characters.');
+    await this.api('POST', '/api/v1/report', { body: { about: address, reason, note } });
+  }
+
   // ── Read and unread ──
 
   #readMark(address) {
@@ -460,6 +507,7 @@ export class Engine extends EventEmitter {
 
   sendText(to, text) {
     return this.serial(async () => {
+      if (this.#blocked(to)) throw new Error('You blocked this person. Unblock them to write.');
       text = String(text || '').trim();
       if (!text || text.length > 20000) throw new Error('Messages can be up to 20,000 characters.');
       const msg = { id: newId(), dir: 'out', kind: 'text', text, at: Date.now(), status: 'sending' };
@@ -471,6 +519,7 @@ export class Engine extends EventEmitter {
 
   sendFile(to, { name, type, data }) {
     return this.serial(async () => {
+      if (this.#blocked(to)) throw new Error('You blocked this person. Unblock them to write.');
       if (!Buffer.isBuffer(data) || data.length === 0 || data.length > MAX_FILE) throw new Error('Files can be up to 100 MB.');
       const key = crypto.randomBytes(32);
       const iv = crypto.randomBytes(12);
@@ -568,6 +617,8 @@ export class Engine extends EventEmitter {
       try {
         const p = await this.#open(env);
         if (p.v !== 1 || typeof p.id !== 'string') throw new Error('unknown payload');
+        // Opened so the keys stay in step; nothing from a blocked person is kept or answered.
+        if (this.#blocked(env.from)) continue;
         if (p.kind === 'text' && typeof p.text === 'string') {
           if (this.#store(env.from, { id: p.id, dir: 'in', kind: 'text', text: p.text.slice(0, 20000), at: p.at || Date.now(), received: Date.now() })) {
             (receipts[env.from] ||= []).push(p.id);
@@ -661,7 +712,7 @@ export class Engine extends EventEmitter {
       const last = conv[conv.length - 1];
       return { address: p.address, name: p.name, org: orgName(p.domain), domain: p.domain, own: p.domain === this.me.domain,
         last: last ? (last.kind === 'file' ? '📎 ' + last.file.name : last.text) : '', lastOut: Boolean(last && last.dir === 'out'),
-        lastAt: last ? last.at : 0, unread: this.#unread(p.address, conv) };
+        lastAt: last ? last.at : 0, unread: this.#blocked(p.address) ? 0 : this.#unread(p.address, conv), blocked: this.#blocked(p.address) };
     });
     const convs = {};
     for (const [a, list] of Object.entries(d.convs)) {

@@ -128,6 +128,7 @@
       <a class="rail-item" href="/people" data-link data-page="people"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8.5" r="3.5"/><path d="M2.5 19.5c.8-3.4 3.4-5.5 6.5-5.5s5.7 2.1 6.5 5.5"/><path d="M15.5 5.3a3.5 3.5 0 0 1 0 6.4M18 14.4c1.8.8 3 2.6 3.5 5.1"/></svg>People</a>
       <a class="rail-item" href="/partners" data-link data-page="partners"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="7" width="8" height="10" rx="2"/><rect x="13.5" y="7" width="8" height="10" rx="2"/><path d="M10.5 12h3"/></svg>Partners<span class="count" id="rail-requests" hidden></span></a>
       <a class="rail-item" href="/domain" data-link data-page="domain"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg>Domain<span class="dot-warn" id="rail-domain-warn" hidden></span></a>
+      <a class="rail-item" href="/reports" data-link data-page="reports"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/></svg>Reports<span class="count" id="rail-reports" hidden></span></a>
       <div class="rail-foot">
         <p class="who"><span id="rail-admin"></span></p>
         <button type="button" class="link-button" id="signout">Sign out</button>
@@ -162,6 +163,13 @@
     <header class="page-head with-action"><div><p class="eyebrow">Partners</p><h1>Partners</h1><p class="hint">Other organizations, each verified by its domain. No one here can write with a partner until you choose who; they choose for their side.</p></div><button type="button" id="connect-open">Connect a partner</button></header>
     <ul class="rows" id="partner-list"></ul>
     <p class="empty" id="partner-empty" hidden>No partners yet. Connect one by its domain.</p>
+    <p class="notice" role="status" data-notice></p>
+  </main>
+
+  <main class="page" id="page-reports" hidden>
+    <header class="page-head"><p class="eyebrow">Reports</p><h1>Reports</h1><p class="hint">Your people can report someone they talk to from the app. A report holds who sent it, about whom, a reason and their own note. Messages stay encrypted between the two people, so they are never part of a report.</p></header>
+    <ul class="rows" id="report-list"></ul>
+    <p class="empty" id="report-empty" hidden>No reports. When someone reports a person from the app, it shows here.</p>
     <p class="notice" role="status" data-notice></p>
   </main>
 

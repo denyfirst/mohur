@@ -118,8 +118,10 @@ function drawPeople() {
         el('span', { class: 'who' },
           el('span', { class: 'line' }, el('strong', {}, p.name), el('time', {}, short(p.lastAt))),
           el('span', { class: 'line' }, preview,
-            p.unread ? el('span', { class: 'badge', 'aria-label': `${p.unread} unread` }, p.unread > 99 ? '99+' : String(p.unread)) : null)));
+            p.blocked ? el('span', { class: 'tag' }, 'Blocked')
+              : p.unread ? el('span', { class: 'badge', 'aria-label': `${p.unread} unread` }, p.unread > 99 ? '99+' : String(p.unread)) : null)));
       if (p.unread) b.dataset.unread = '';
+      if (p.blocked) b.dataset.blocked = '';
       b.addEventListener('click', () => {
         current = p.address;
         drawPeople();
@@ -157,12 +159,19 @@ function drawConversation(scroll) {
   $('conv-empty').hidden = Boolean(p);
   $('conv-head').hidden = !p;
   $('messages').hidden = !p;
-  $('composer').hidden = !p;
+  $('composer').hidden = !p || p.blocked;
+  $('blocked-bar').hidden = !p || !p.blocked;
+  closeMenu();
   if (!p) return;
+  const first = p.name.split(/\s+/)[0];
+  $('blocked-text').textContent = `You blocked ${p.name}. They are not told, and nothing they send is kept.`;
+  $('menu-block-text').textContent = p.blocked ? `Unblock ${first}` : `Block ${first}`;
+  $('menu-block').toggleAttribute('data-blocked', Boolean(p.blocked));
+  $('conv-chip').toggleAttribute('data-blocked', Boolean(p.blocked));
   avatar($('conv-avatar'), p);
   $('conv-name').textContent = p.name;
   $('conv-addr').textContent = `${p.address} · ${p.org}`;
-  $('conv-chip-text').textContent = 'Verified by ' + p.domain;
+  $('conv-chip-text').textContent = p.blocked ? 'Blocked' : 'Verified by ' + p.domain;
   const box = $('messages');
   const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
   const opened = drawnFor !== p.address;
@@ -215,6 +224,56 @@ function toast(text, kind) {
   t.hidden = false;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { t.hidden = true; }, kind === 'bad' ? 6000 : 2500);
+}
+
+// ── The conversation menu: report and block ──
+
+function closeMenu() {
+  $('conv-menu').hidden = true;
+  $('conv-more').setAttribute('aria-expanded', 'false');
+}
+
+function openReport() {
+  const p = snap.people.find((x) => x.address === current);
+  if (!p) return;
+  closeMenu();
+  $('report-form').reset();
+  $('report-title').textContent = 'Report ' + p.name + ' to your admin';
+  $('report-block-text').textContent = 'Also block ' + p.name.split(/\s+/)[0] + ' on this computer';
+  $('report-block').checked = !p.blocked;
+  $('report-block').parentElement.hidden = Boolean(p.blocked);
+  $('report-notice').textContent = '';
+  delete $('report-notice').dataset.kind;
+  $('report-dialog').showModal();
+}
+
+async function sendReport(ev) {
+  ev.preventDefault();
+  const p = snap.people.find((x) => x.address === current);
+  const reason = ($('report-form').querySelector('input[name=reason]:checked') || {}).value;
+  if (!p) return;
+  if (!reason) { $('report-notice').textContent = 'Choose a reason.'; $('report-notice').dataset.kind = 'bad'; return; }
+  $('report-send').disabled = true;
+  try {
+    await m.report(p.address, reason, $('report-note').value);
+    if ($('report-block').checked && !p.blocked) await m.block(p.address);
+    $('report-dialog').close();
+    toast('Report sent to your admin.');
+  } catch (e) {
+    $('report-notice').textContent = e.message;
+    $('report-notice').dataset.kind = 'bad';
+  }
+  $('report-send').disabled = false;
+}
+
+async function toggleBlock() {
+  const p = snap.people.find((x) => x.address === current);
+  closeMenu();
+  if (!p) return;
+  try {
+    if (p.blocked) { await m.unblock(p.address); toast(p.name + ' is unblocked.'); }
+    else { await m.block(p.address); toast(p.name + ' is blocked on this computer.'); }
+  } catch (e) { toast(e.message, 'bad'); }
 }
 
 function wire() {
@@ -293,6 +352,20 @@ function wire() {
     if (!current) return;
     try { await m.sendFile(current); } catch (e) { alertIn(e.message); }
   });
+  $('conv-more').addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    const open = $('conv-menu').hidden;
+    $('conv-menu').hidden = !open;
+    $('conv-more').setAttribute('aria-expanded', String(open));
+    if (open) $('menu-report').focus();
+  });
+  document.addEventListener('click', (ev) => { if (!ev.target.closest('.more')) closeMenu(); });
+  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !$('conv-menu').hidden) { closeMenu(); $('conv-more').focus(); } });
+  $('menu-report').addEventListener('click', openReport);
+  $('menu-block').addEventListener('click', toggleBlock);
+  $('unblock').addEventListener('click', toggleBlock);
+  $('report-form').addEventListener('submit', sendReport);
+  $('report-cancel').addEventListener('click', () => $('report-dialog').close());
   window.addEventListener('focus', markSeen);
   m.onUpdate(() => refresh().catch(() => {}));
 }

@@ -101,6 +101,9 @@ function wire() {
   });
   handle('refresh', () => engine.serial(() => engine.syncContacts(true)));
   handle('read', (address) => engine.markRead(str(address, 300)));
+  handle('block', (address) => engine.block(str(address, 300)));
+  handle('unblock', (address) => engine.unblock(str(address, 300)));
+  handle('report', ({ address, reason, note } = {}) => engine.report(str(address, 300), str(reason, 20), str(note || '', 4000)));
 }
 
 function harden() {

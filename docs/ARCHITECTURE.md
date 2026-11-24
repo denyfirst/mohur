@@ -128,10 +128,35 @@ build the same bytes; there is no JSON canonicalization.
 Federation requests older than five minutes, or with a nonce already seen, are
 refused.
 
+## Blocking and reports
+
+A person can block someone from the conversation menu. Blocking happens on
+their own computer:
+- Messages from a blocked person are still opened, so the conversation keys
+  stay in step, but they are not kept and get no delivery receipt.
+- The blocked person is not told.
+- Unblocking picks the conversation up where the keys are.
+
+A person can also report someone to their own organization's admin. A report
+holds:
+- who sent it and whom it is about;
+- one of four reasons;
+- an optional note of up to 1,000 characters in their own words.
+
+A report never holds a message. Messages stay encrypted between the two
+people. The note is sealed at rest with the instance key and is never logged.
+Partners hear nothing of reports. An admin sees open reports on the Reports
+page and marks them handled. The admin can act from the People page (remove
+the person) or the Partners page (choose who writes with that partner, or
+disconnect). A person can send five reports a minute. A server keeps at most
+1,000 open reports, and handled ones go after 90 days.
+
 ## What servers learn
 
 Servers see who writes to whom, when, and how large the ciphertext is. They do
-not see message text, file contents, file names or keys. An organization's
+not see message text, file contents, file names or keys. A report that a
+person sends to their own admin is the one place where their own words, not a
+message, reach the server. An organization's
 admin can add a device for their own employee; the employee's partners then see
 the new-device notice, so it cannot happen silently.
 
