@@ -57,7 +57,9 @@
 
 - A test on two separate machines (the install script and its Linux lab are
   done; see [INSTALL.md](INSTALL.md)), automatic certificates, and real domains.
-- Signed app installers and updates.
+- A Microsoft Store listing. The Windows package (MSIX) builds and installs;
+  see [packaging/windows](../packaging/windows/README.md). Updates will come
+  from the Store.
 - New signed prekeys over time (the first ones are kept), and a server-side
   retry queue for an unreachable partner (the app retries today).
 - More than one device per person, mobile apps, groups.

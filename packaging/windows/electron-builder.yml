@@ -1,0 +1,46 @@
+# Packages the Mohur desktop app (../../client) for Windows as an MSIX for
+# the Microsoft Store, which signs it. Paths are relative to the app folder.
+# The identity values come from Partner Center; build.ps1 passes them in.
+appId: dev.denyfirst.mohur
+productName: Mohur
+executableName: Mohur
+copyright: "Copyright © denyfirst. AGPL-3.0-only."
+directories:
+  output: ../.work/dist/windows
+  buildResources: ../packaging/windows/build
+files:
+  - package.json
+  - src/**
+  - assets/**
+  - "!test/**"
+  # One processor per package: the x64 build carries only the x64 library.
+  - "!node_modules/@signalapp/libsignal-client-win32/prebuilds/win32-arm64/**"
+# The current Windows SDK tools (10.0.26100); the default bundle is too old to
+# sign MSIX on Windows 11. Checksums are pinned inside electron-builder.
+toolsets:
+  winCodeSign: "1.1.0"
+asar: true
+asarUnpack:
+  - "**/*.node"
+npmRebuild: false
+# The window is English only; other Chromium languages would add about 40 MB.
+electronLanguages: [en-US]
+nodeGypRebuild: false
+win:
+  target:
+    - target: appx
+      arch: [x64]
+  icon: assets/mohur-256.png
+appx:
+  applicationId: Mohur
+  identityName: Denyfirst.Mohur
+  publisher: CN=Mohur Test
+  publisherDisplayName: Denyfirst
+  displayName: Mohur
+  backgroundColor: "#16181d"
+  languages: [en-US]
+  showNameOnTiles: false
+  addAutoLaunchExtension: false
+  # Electron 45 needs Windows 10 1809 or later.
+  minVersion: 10.0.17763.0
+  maxVersionTested: 10.0.26100.0

@@ -1,0 +1,9 @@
+{
+  "name": "mohur-windows-package",
+  "private": true,
+  "description": "Builds the Mohur desktop app into a Windows package (MSIX for the Microsoft Store). Not part of the app.",
+  "license": "AGPL-3.0-only",
+  "devDependencies": {
+    "electron-builder": "26.18.1"
+  }
+}
