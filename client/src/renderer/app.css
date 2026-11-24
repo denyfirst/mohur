@@ -132,7 +132,7 @@ button.secondary:hover:not(:disabled) { background: var(--side); }
 .conv-empty .title { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
 .conv-empty .sub-text { color: var(--soft); }
 .conv-empty .lock-line { margin-top: 18px; }
-.conv-head { display: flex; gap: 14px; align-items: center; padding: 12px 24px; background: color-mix(in srgb, var(--card) 88%, transparent); border-bottom: 1px solid var(--rule); backdrop-filter: blur(8px); }
+.conv-head { position: relative; z-index: 5; display: flex; gap: 14px; align-items: center; padding: 12px 24px; background: color-mix(in srgb, var(--card) 88%, transparent); border-bottom: 1px solid var(--rule); backdrop-filter: blur(8px); }
 .conv-who { flex: 1; min-width: 0; }
 .conv-who strong { font-size: 16px; }
 .chip { display: inline-flex; gap: 6px; align-items: center; padding: 5px 11px 5px 8px; font-size: 12px; font-weight: 650; color: var(--good); background: color-mix(in srgb, var(--good) 9%, transparent); border: 1px solid color-mix(in srgb, var(--good) 35%, transparent); border-radius: 999px; white-space: nowrap; }
@@ -180,3 +180,34 @@ button.secondary:hover:not(:disabled) { background: var(--side); }
 
 @media (max-width: 900px) { .app { grid-template-columns: 270px minmax(0, 1fr); } .messages, .composer { padding-left: 16px; padding-right: 16px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* Conversation menu, blocking and reporting */
+.more { position: relative; }
+.menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 10; display: grid; min-width: 230px; width: max-content; max-width: 320px; padding: 6px; background: var(--raised); border: 1px solid var(--rule); border-radius: 12px; box-shadow: var(--lift); animation: rise 0.12s ease-out; }
+.menu button { display: flex; white-space: nowrap; gap: 10px; align-items: center; justify-content: flex-start; width: 100%; min-height: 38px; padding: 0 10px; font-weight: 550; color: var(--ink); text-align: left; background: none; border: 0; border-radius: 8px; }
+.menu button:hover:not(:disabled), .menu button:focus-visible { background: color-mix(in srgb, var(--ink) 7%, transparent); }
+.menu .i { width: 18px; height: 18px; color: var(--soft); }
+.menu #menu-block[data-blocked] .i { color: var(--good); }
+.blocked-bar { display: flex; gap: 12px; align-items: center; margin: 10px 28px 16px; padding: 10px 12px 10px 16px; font-size: 14px; color: var(--soft); background: var(--card); border: 1px solid var(--rule); border-radius: 14px; }
+.blocked-bar .i { width: 18px; height: 18px; color: var(--bad); }
+.blocked-bar span { flex: 1; }
+.blocked-bar button { min-height: 34px; padding: 0 14px; font-size: 14px; }
+.person[data-blocked] { opacity: 0.55; }
+.person .tag { flex: none; padding: 1px 8px; font-size: 11px; font-weight: 650; color: var(--soft); border: 1px solid var(--rule); border-radius: 999px; }
+.chip[data-blocked] { color: var(--soft); background: none; border-color: var(--rule); }
+
+dialog.sheet { width: min(92vw, 460px); padding: 0; color: var(--ink); background: var(--card); border: 1px solid var(--rule); border-radius: 18px; box-shadow: var(--lift); }
+dialog.sheet::backdrop { background: rgba(8, 10, 14, 0.45); backdrop-filter: blur(2px); }
+dialog.sheet form { padding: 24px; }
+dialog.sheet h2 { margin: 0 0 6px; font-size: 19px; letter-spacing: -0.01em; }
+dialog.sheet .hint { margin: 0 0 6px; font-size: 13.5px; }
+.reasons { display: grid; gap: 2px; margin: 14px 0 0; padding: 0; border: 0; }
+.reasons legend { margin-bottom: 6px; padding: 0; font-size: 14px; font-weight: 600; color: var(--soft); }
+.reasons label, label.check { display: flex; gap: 10px; align-items: center; margin: 0; padding: 7px 10px; font-size: 14.5px; font-weight: 500; color: var(--ink); border-radius: 10px; cursor: pointer; }
+.reasons label:hover, label.check:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
+.reasons input, label.check input { width: 16px; height: 16px; min-height: 0; margin: 0; accent-color: var(--accent); }
+#report-note { min-height: 92px; padding: 10px 12px; resize: vertical; line-height: 1.45; }
+label.check { margin-top: 10px; padding-left: 4px; }
+.optional { font-weight: 400; color: var(--faint); }
+.sheet-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+.sheet-actions button { min-height: 40px; }

@@ -142,6 +142,60 @@ test('unread messages are counted until read, and the mark survives a restart', 
   while (await aylin.pollOnce() > 0) { /* drain receipts */ }
 });
 
+test("a blocked person's messages are neither kept nor answered", async () => {
+  const aylinFor = () => kamran.snapshot().people.find((x) => x.address === 'aylin@alpha.e2e.test');
+  await kamran.block('aylin@alpha.e2e.test');
+  assert.equal(aylinFor().blocked, true);
+  // The block is on disk at once, before anything else saves the vault.
+  kamran = await engine('kamran');
+  assert.equal(aylinFor().blocked, true, 'the block was saved');
+  const kept = kamran.snapshot().convs['aylin@alpha.e2e.test'].length;
+  await aylin.sendText('kamran@beta.e2e.test', 'while blocked');
+  while (await kamran.pollOnce() > 0) { /* drain */ }
+  assert.equal(kamran.snapshot().convs['aylin@alpha.e2e.test'].length, kept, 'nothing from a blocked person is kept');
+  assert.equal(aylinFor().unread, 0);
+  while (await aylin.pollOnce() > 0) { /* drain */ }
+  const sent = aylin.snapshot().convs['kamran@beta.e2e.test'].at(-1);
+  assert.equal(sent.text, 'while blocked');
+  assert.notEqual(sent.status, 'delivered', 'a blocked person gets no receipt');
+  await assert.rejects(kamran.sendText('aylin@alpha.e2e.test', 'hello?'), /blocked/);
+  await assert.rejects(kamran.sendFile('aylin@alpha.e2e.test', { name: 'a.txt', type: 'text/plain', data: Buffer.from('a') }), /blocked/);
+
+  // The block survives a restart; unblocking finds the keys still in step.
+  kamran = await engine('kamran');
+  assert.equal(aylinFor().blocked, true);
+  await kamran.unblock('aylin@alpha.e2e.test');
+  assert.equal(aylinFor().blocked, false);
+  await aylin.sendText('kamran@beta.e2e.test', 'after the block');
+  while (await kamran.pollOnce() > 0) { /* drain */ }
+  assert.equal(kamran.snapshot().convs['aylin@alpha.e2e.test'].at(-1).text, 'after the block');
+  while (await aylin.pollOnce() > 0) { /* drain */ }
+  assert.equal(aylin.snapshot().convs['kamran@beta.e2e.test'].at(-1).status, 'delivered');
+
+  for (const bad of ['', 'nobody', '__proto__', 'Aylin@alpha.e2e.test', 'kamran@beta.e2e.test', 'a'.repeat(301)]) {
+    await assert.rejects(kamran.block(bad), undefined, JSON.stringify(bad));
+  }
+  assert.deepEqual(Object.keys(kamran.vault.data.blocked), []);
+});
+
+test('a report goes to the reporter\'s own admin, with a reason and a note only', async () => {
+  await kamran.report('aylin@alpha.e2e.test', 'spam', 'Testing the report button.');
+  await kamran.report('aylin@alpha.e2e.test', 'other');
+  // Bad reports are refused by the app itself, before anything is sent.
+  const calls = [];
+  const api = kamran.api;
+  kamran.api = (...args) => { calls.push(args[1]); return api.apply(kamran, args); };
+  try {
+    await assert.rejects(kamran.report('aylin@alpha.e2e.test', 'nonsense'), /reason/);
+    await assert.rejects(kamran.report('aylin@alpha.e2e.test', 'other', 'x'.repeat(1001)), /1,000/);
+    await assert.rejects(kamran.report('kamran@beta.e2e.test', 'spam'), /you/);
+    await assert.rejects(kamran.report('not an address', 'spam'));
+  } finally {
+    kamran.api = api;
+  }
+  assert.deepEqual(calls, [], 'a refused report reached the server');
+});
+
 test('the vault on disk holds no readable message text or keys', async () => {
   const raw = fs.readFileSync(path.join(tmp, 'kamran', 'vault.bin'));
   assert.equal(raw.subarray(0, 4).toString(), 'MHV1');

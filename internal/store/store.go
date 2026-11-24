@@ -39,6 +39,7 @@ var (
 	bucketBlobs       = []byte("blobs")
 	bucketNonces      = []byte("nonces")
 	bucketDirectory   = []byte("directory")
+	bucketReports     = []byte("reports")
 )
 
 // Store is the server's database.
@@ -93,7 +94,7 @@ func Open(dir, keyFile string) (*Store, error) {
 		return nil, err
 	}
 	err = db.Update(func(tx *bolt.Tx) error {
-		for _, b := range [][]byte{bucketMeta, bucketAdmins, bucketPeople, bucketInvites, bucketConnections, bucketQueue, bucketBlobs, bucketNonces, bucketDirectory} {
+		for _, b := range [][]byte{bucketMeta, bucketAdmins, bucketPeople, bucketInvites, bucketConnections, bucketQueue, bucketBlobs, bucketNonces, bucketDirectory, bucketReports} {
 			if _, err := tx.CreateBucketIfNotExists(b); err != nil {
 				return err
 			}
