@@ -134,6 +134,9 @@ export class Engine extends EventEmitter {
     this.prekeys = new PreKeyStore(st);
     this.signed = new SignedPreKeyStore(st);
     this.kyber = new KyberStore(st);
+    // Messages from before the app counted unread ones are taken as read.
+    const d = vault.data;
+    if (d && !d.read) { d.read = {}; d.readFrom = Date.now(); }
   }
 
   get joined() { return Boolean(this.vault.data && this.vault.data.me); }
@@ -209,6 +212,7 @@ export class Engine extends EventEmitter {
       orgs: { [domain]: { name: doc.name, key: doc.key } },
       people: [],
       convs: {},
+      read: {},
       outbox: [],
       notices: [],
     };
@@ -349,8 +353,44 @@ export class Engine extends EventEmitter {
     // mail means people or partners changed, and the list is read again.
     this.directory = res.directory;
     this.directoryChanged = false;
+    this.syncedAt = Date.now();
     await this.vault.save();
     this.changed();
+  }
+
+  // refreshIfStale reads the contacts again when they are older than maxAge.
+  // The window calls it whenever it comes to the front, so a change that was
+  // somehow missed shows up without anyone asking.
+  refreshIfStale(maxAge = 15000) {
+    if (!this.joined || Date.now() - (this.syncedAt || 0) < maxAge) return Promise.resolve(false);
+    return this.serial(() => this.syncContacts()).then(() => true);
+  }
+
+  // ── Read and unread ──
+
+  #readMark(address) {
+    const d = this.vault.data;
+    return (d.read && Object.hasOwn(d.read, address) && d.read[address]) || d.readFrom || 0;
+  }
+
+  #unread(address, conv) {
+    const mark = this.#readMark(address);
+    return conv.filter((m) => m.dir === 'in' && (m.received || m.at || 0) > mark).length;
+  }
+
+  // markRead records that a conversation was seen up to its newest message
+  // from the other side.
+  markRead(address) {
+    return this.serial(async () => {
+      const d = this.vault.data;
+      if (!this.joined || !Object.hasOwn(d.convs, address) || !Array.isArray(d.convs[address])) return false;
+      const newest = d.convs[address].reduce((t, m) => (m.dir === 'in' ? Math.max(t, m.received || m.at || 0) : t), 0);
+      if (newest <= this.#readMark(address)) return false;
+      (d.read ||= {})[address] = newest;
+      await this.vault.save();
+      this.changed();
+      return true;
+    });
   }
 
   // ── Sending ──
@@ -620,7 +660,8 @@ export class Engine extends EventEmitter {
       const conv = d.convs[p.address] || [];
       const last = conv[conv.length - 1];
       return { address: p.address, name: p.name, org: orgName(p.domain), domain: p.domain, own: p.domain === this.me.domain,
-        last: last ? (last.kind === 'file' ? '📎 ' + last.file.name : last.text) : '', lastAt: last ? last.at : 0 };
+        last: last ? (last.kind === 'file' ? '📎 ' + last.file.name : last.text) : '', lastOut: Boolean(last && last.dir === 'out'),
+        lastAt: last ? last.at : 0, unread: this.#unread(p.address, conv) };
     });
     const convs = {};
     for (const [a, list] of Object.entries(d.convs)) {

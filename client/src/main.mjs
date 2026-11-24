@@ -1,7 +1,7 @@
 // Mohur desktop app, main process. It owns the engine and the keys; the
 // window is sandboxed, has no Node, loads only the app's own files and
 // reaches the engine through the few calls preload.cjs exposes.
-import { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage, session, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, safeStorage, session, shell } from 'electron';
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import os from 'node:os';
@@ -100,6 +100,7 @@ function wire() {
     return true;
   });
   handle('refresh', () => engine.serial(() => engine.syncContacts(true)));
+  handle('read', (address) => engine.markRead(str(address, 300)));
 }
 
 function harden() {
@@ -116,13 +117,28 @@ function harden() {
 function createWindow() {
   win = new BrowserWindow({
     width: 1120, height: 740, minWidth: 760, minHeight: 520, show: false, title: 'Mohur',
-    backgroundColor: '#f4f6f9', autoHideMenuBar: true,
+    icon: path.join(here, '..', 'assets', 'mohur-256.png'),
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#0d1015' : '#f5f7fa', autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(here, 'preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false,
       webSecurity: true, devTools: !app.isPackaged, spellcheck: false,
     },
   });
   win.once('ready-to-show', () => win.show());
+  // Coming to the front reads the list again if it is not fresh, and stops
+  // the taskbar flashing that a new message started.
+  win.on('focus', () => {
+    win.flashFrame(false);
+    if (engine && engine.joined) engine.refreshIfStale().catch(() => {});
+  });
+  // The page puts the unread count in its title, "(2) Mohur"; a higher count
+  // while the window is in the background flashes it in the taskbar.
+  let unread = 0;
+  win.on('page-title-updated', (_ev, title) => {
+    const n = Number((/^\((\d+)\)/.exec(title) || [])[1] || 0);
+    if (n > unread && !win.isFocused()) win.flashFrame(true);
+    unread = n;
+  });
   win.loadURL(indexURL);
 }
 

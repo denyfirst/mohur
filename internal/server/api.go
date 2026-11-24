@@ -253,11 +253,17 @@ func (s *Server) partnerPeople(ctx context.Context, c store.Connection, fresh bo
 	return valid
 }
 
+// freshPerMinute is how often one person may have partners' lists read again
+// at once (the app's Refresh). Beyond that the cached lists answer, so no
+// app can make this server call its partners without limit.
+const freshPerMinute = 6
+
 // contacts lists colleagues and the people of each partner this person may
 // write with. The directory version is read first, so a change made while
 // the list is built shows as a newer version with the next mail.
 func (s *Server) contacts(w http.ResponseWriter, r *http.Request, c clientSession) {
 	version := s.directoryVersion()
+	fresh := r.URL.Query().Get("fresh") == "1" && s.allow(r, "fresh|"+c.user, freshPerMinute)
 	o, _, _ := s.org()
 	people := s.localPeople()
 	orgs := []orgView{{Domain: o.Domain, Name: o.Name, Key: proto.B64(o.Pub)}}
@@ -267,7 +273,7 @@ func (s *Server) contacts(w http.ResponseWriter, r *http.Request, c clientSessio
 			continue
 		}
 		orgs = append(orgs, orgView{Domain: conn.Domain, Name: conn.Name, Key: conn.Key})
-		people = append(people, s.partnerPeople(r.Context(), conn, r.URL.Query().Get("fresh") == "1")...)
+		people = append(people, s.partnerPeople(r.Context(), conn, fresh)...)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"self": c.user + "@" + o.Domain, "orgs": orgs, "people": people, "directory": version})
 }

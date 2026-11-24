@@ -1,6 +1,6 @@
 # Status
 
-23 November 2026. First working version; not released, no users.
+24 November 2026. First working version; not released, no users.
 
 ## Works, with tests
 
@@ -14,7 +14,8 @@
 - **Desktop app**: join with an invite after verifying the organization, a
   contact list of colleagues and partners, one-to-one messages with delivery
   receipts, files up to 100 MB, an encrypted local vault protected by the
-  operating system, retry when a partner's server is away.
+  operating system, retry when a partner's server is away, unread counts that
+  survive a restart, and a Refresh button for the contact list.
 - **Tests**: Go end-to-end tests run three organizations over real TLS and DNS
   and check refusals: an unconnected organization, a replayed or altered
   request, an old request, a forged device certificate, a sender outside the
@@ -30,6 +31,8 @@
   refused; a removed person's access is not inherited by a new one with the
   same user name; a waiting app is woken by a new partner, and a partner's new
   person reaches another organization's app without the one-minute wait.
+  Refresh reads partners afresh at most six times a minute per person, and
+  never on any value but `fresh=1`.
   The admin reset is tested the same way: a code from the instance key lets the
   admin set a new password and authenticator once, within the hour; expired,
   altered, malformed, foreign, reused and cross-site attempts are refused, as
@@ -39,14 +42,16 @@
   Tests use `*.e2e.test` names, so lab entries in a hosts file cannot collide.
   The app's end-to-end test
   runs two real servers and two engines with libsignal: joining, contacts,
-  messages and receipts, a 3 MB file, a restart, the vault on disk, and a
+  messages and receipts, a 3 MB file, a restart, unread counts and their
+  read marks (kept across a restart, odd addresses refused), the vault on disk, and a
   certificate from the wrong organization; further tests check the
   organization check, invite parsing and that sessions are post-quantum.
 - **Sabotage**: each of those checks was switched off in turn and a test
   failed every time, except the sender-domain check on delivery, which the
   device-certificate check already covers. The 17 partner-access and
-  change-notice checks, the 13 admin-reset checks and the 10 chosen-only checks
-  were switched off the same way; each was caught.
+  change-notice checks, the 13 admin-reset checks, the 10 chosen-only checks
+  and the 9 refresh-limit and read-mark checks were switched off the same way;
+  each was caught.
 
 ## Not yet
 

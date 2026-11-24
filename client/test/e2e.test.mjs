@@ -112,6 +112,36 @@ test('many messages both ways, and sessions survive a restart', async () => {
   }
 });
 
+test('unread messages are counted until read, and the mark survives a restart', async () => {
+  const unread = () => kamran.snapshot().people.find((p) => p.address === 'aylin@alpha.e2e.test').unread;
+  assert.ok(unread() > 0, 'a new app counts what arrived since it joined');
+  // A vault from before unread counts takes everything it holds as read.
+  delete kamran.vault.data.read;
+  delete kamran.vault.data.readFrom;
+  await kamran.vault.save();
+  kamran = await engine('kamran');
+  assert.equal(unread(), 0);
+
+  await aylin.sendText('kamran@beta.e2e.test', 'one');
+  await aylin.sendText('kamran@beta.e2e.test', 'two');
+  while (await kamran.pollOnce() > 0) { /* drain */ }
+  assert.equal(unread(), 2);
+  // Writing back is not reading: the count stays until the conversation is read.
+  await kamran.sendText('aylin@alpha.e2e.test', 'reply');
+  assert.equal(unread(), 2);
+  assert.equal(await kamran.markRead('aylin@alpha.e2e.test'), true);
+  assert.equal(unread(), 0);
+  assert.equal(await kamran.markRead('aylin@alpha.e2e.test'), false, 'nothing new to mark');
+  kamran = await engine('kamran');
+  assert.equal(unread(), 0, 'the mark survives a restart');
+  // Unknown and odd addresses change nothing.
+  for (const bad of ['nobody@beta.e2e.test', '__proto__', 'constructor', 'toString', '']) {
+    assert.equal(await kamran.markRead(bad), false, bad);
+  }
+  assert.equal(Object.keys(kamran.vault.data.read).join(), 'aylin@alpha.e2e.test');
+  while (await aylin.pollOnce() > 0) { /* drain receipts */ }
+});
+
 test('the vault on disk holds no readable message text or keys', async () => {
   const raw = fs.readFileSync(path.join(tmp, 'kamran', 'vault.bin'));
   assert.equal(raw.subarray(0, 4).toString(), 'MHV1');
