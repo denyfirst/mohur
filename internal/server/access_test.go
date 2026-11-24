@@ -425,3 +425,71 @@ func TestAppsHearOfChangesAtOnce(t *testing.T) {
 		t.Fatalf("partner's change notice: %d", s)
 	}
 }
+
+func TestFreshContactReadsAreLimitedPerPerson(t *testing.T) {
+	l := newLab(t)
+	alpha, beta := l.start("alpha.e2e.test"), l.start("beta.e2e.test")
+	connect(t, alpha, beta)
+	aylin := alpha.join(alpha.inviteFor("aylin", "Aylin", "beta.e2e.test"), 200)
+	murad := alpha.join(alpha.inviteFor("murad", "Murad", "beta.e2e.test"), 200)
+	kamran := beta.join(beta.inviteFor("kamran", "Kamran", "alpha.e2e.test"), 200)
+
+	start := time.Now()
+	now := start
+	alpha.srv.SetClock(func() time.Time { return now })
+	alpha.st.SetClock(func() time.Time { return now })
+	defer alpha.srv.SetClock(time.Now)
+	defer alpha.st.SetClock(time.Now)
+	// fetched is when Alpha last read Beta's list from Beta itself.
+	fetched := func() int64 {
+		t.Helper()
+		_, at, err := alpha.st.Directory("beta.e2e.test")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return at.Unix()
+	}
+	read := func(d *device, fresh bool) {
+		t.Helper()
+		if got, _ := d.contacts(fresh); !slices.Contains(got, kamran.address) {
+			t.Fatalf("%s does not see Kamran: %v", d.address, got)
+		}
+	}
+
+	// Each Refresh reads Beta again, up to the limit.
+	for i := 0; i < freshPerMinute; i++ {
+		now = now.Add(time.Second)
+		read(aylin, true)
+		if fetched() != now.Unix() {
+			t.Fatalf("fresh read %d was answered from the cache", i+1)
+		}
+	}
+	// One more within the minute is answered from the cache, as is a plain read.
+	now = now.Add(time.Second)
+	read(aylin, true)
+	read(aylin, false)
+	if fetched() == now.Unix() {
+		t.Fatal("a fresh read over the limit reached the partner")
+	}
+	// The limit is per person: Murad's Refresh still works.
+	read(murad, true)
+	if fetched() != now.Unix() {
+		t.Fatal("one person's refreshes used up another's")
+	}
+	// A minute after Aylin's first Refresh she may refresh again, while the
+	// cache alone would still be used.
+	now = start.Add(time.Minute + time.Second)
+	read(aylin, true)
+	if fetched() != now.Unix() {
+		t.Fatal("refresh stayed off after the minute")
+	}
+	// Anything but fresh=1 is a plain read.
+	now = now.Add(time.Second)
+	var res struct {
+		People []proto.Person `json:"people"`
+	}
+	aylin.call("GET", "/api/v1/contacts?fresh=yes", nil, &res, 200)
+	if fetched() == now.Unix() {
+		t.Fatal("fresh=yes was taken as fresh")
+	}
+}
