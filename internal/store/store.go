@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"time"
 
 	bolt "go.etcd.io/bbolt"
@@ -49,7 +50,7 @@ type Store struct {
 	macKey   []byte
 	resetKey []byte
 	blobDir  string
-	now      func() time.Time
+	clock    atomic.Pointer[func() time.Time]
 }
 
 // Open opens or creates the database in dir. keyFile holds the 32-byte
@@ -105,14 +106,18 @@ func Open(dir, keyFile string) (*Store, error) {
 		_ = db.Close()
 		return nil, err
 	}
-	return &Store{db: db, aead: aead, macKey: macKey, resetKey: resetKey, blobDir: blobDir, now: time.Now}, nil
+	st := &Store{db: db, aead: aead, macKey: macKey, resetKey: resetKey, blobDir: blobDir}
+	st.SetClock(time.Now)
+	return st, nil
 }
 
 // Close closes the database.
 func (s *Store) Close() error { return s.db.Close() }
 
-// SetClock replaces the clock; tests only.
-func (s *Store) SetClock(now func() time.Time) { s.now = now }
+// SetClock replaces the clock; tests only. It is safe while requests run.
+func (s *Store) SetClock(now func() time.Time) { s.clock.Store(&now) }
+
+func (s *Store) now() time.Time { return (*s.clock.Load())() }
 
 func instanceKey(path string) ([]byte, error) {
 	b, err := os.ReadFile(path) // #nosec G304 -- the operator chooses the key path at start

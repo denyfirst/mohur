@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/denyfirst/mohur/internal/discover"
@@ -25,10 +26,10 @@ import (
 
 // Server serves one organization.
 type Server struct {
-	st   *store.Store
-	disc *discover.Verifier
-	log  *slog.Logger
-	now  func() time.Time
+	st    *store.Store
+	disc  *discover.Verifier
+	log   *slog.Logger
+	clock atomic.Pointer[func() time.Time]
 
 	mu        sync.Mutex
 	admins    map[[32]byte]adminSession
@@ -66,14 +67,18 @@ type window struct {
 
 // New makes a server over an open store.
 func New(st *store.Store, disc *discover.Verifier, log *slog.Logger) *Server {
-	return &Server{st: st, disc: disc, log: log, now: time.Now,
+	s := &Server{st: st, disc: disc, log: log,
 		admins: map[[32]byte]adminSession{}, clients: map[[32]byte]clientSession{},
 		setupSeed: map[[32]byte]string{}, waiters: map[string][]chan struct{}{},
 		limits: map[string]*window{}, nonces: map[string]clientNonce{}, directory: time.Now().Unix()}
+	s.SetClock(time.Now)
+	return s
 }
 
-// SetClock replaces the clock; tests only.
-func (s *Server) SetClock(now func() time.Time) { s.now = now }
+// SetClock replaces the clock; tests only. It is safe while requests run.
+func (s *Server) SetClock(now func() time.Time) { s.clock.Store(&now) }
+
+func (s *Server) now() time.Time { return (*s.clock.Load())() }
 
 // Handler returns the complete HTTP handler.
 func (s *Server) Handler() http.Handler {

@@ -106,8 +106,8 @@ func TestResetLetsTheAdminBackIn(t *testing.T) {
 func TestResetAttemptsAreLimited(t *testing.T) {
 	l := newLab(t)
 	alpha := l.start("alpha.e2e.test")
-	now := time.Now()
-	alpha.srv.SetClock(func() time.Time { return now })
+	clock := &testClock{t: time.Now()}
+	alpha.srv.SetClock(clock.Now)
 	away := alpha.browser()
 	for range 10 {
 		away.adminCall("reset/start", map[string]any{"code": store.RandomCode(15)}, nil, 403)
@@ -121,7 +121,7 @@ func TestResetAttemptsAreLimited(t *testing.T) {
 	if !strings.Contains(refused.Error, "Wait a minute") {
 		t.Fatalf("the eleventh attempt in a minute: %q", refused.Error)
 	}
-	now = now.Add(time.Minute)
+	clock.Add(time.Minute)
 	away.adminCall("reset/start", map[string]any{"code": code}, nil, 200)
 }
 

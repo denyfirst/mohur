@@ -114,8 +114,8 @@ func TestReportRefusals(t *testing.T) {
 
 	// Refused attempts count towards the limit too, so the clock moves on a
 	// minute before each one here.
-	now := time.Now()
-	alpha.srv.SetClock(func() time.Time { return now })
+	clock := &testClock{t: time.Now()}
+	alpha.srv.SetClock(clock.Now)
 	defer alpha.srv.SetClock(time.Now)
 	for _, c := range []struct{ about, reason, note string }{
 		{"", "spam", ""},
@@ -130,10 +130,10 @@ func TestReportRefusals(t *testing.T) {
 		{murad.address, "other", "bell\a"},
 		{murad.address, "other", "line\u2028break"},
 	} {
-		now = now.Add(time.Minute)
+		clock.Add(time.Minute)
 		aylin.report(c.about, c.reason, c.note, 400)
 	}
-	now = now.Add(time.Minute)
+	clock.Add(time.Minute)
 	aylin.report(murad.address, "other", strings.Repeat("é", 1000), 200)
 	if n := alpha.openReportCount(); n != 1 {
 		t.Fatalf("refused reports were stored: %d open", n)
@@ -146,7 +146,7 @@ func TestReportRefusals(t *testing.T) {
 
 	// Five a minute per person, refused ones included; then the sixth waits,
 	// and others are not held up.
-	now = now.Add(time.Minute)
+	clock.Add(time.Minute)
 	for i := 0; i < 5; i++ {
 		aylin.report(murad.address, "spam", "", 200)
 	}
