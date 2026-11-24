@@ -70,6 +70,7 @@ func run() error {
 	dir := flag.String("dir", ".work/lab", "lab directory")
 	orgs := flag.String("orgs", "alpha.test,beta.test", "organization domains")
 	noConnect := flag.Bool("no-connect", false, "leave the organizations unconnected")
+	logAll := flag.Bool("log-all", false, "log every event, as mohurd does, not only warnings")
 	var invites multi
 	flag.Var(&invites, "invite", "domain:username:Full Name, repeatable")
 	flag.Parse()
@@ -101,7 +102,11 @@ func run() error {
 				return d.DialContext(ctx, network, addrs[host])
 			}}}
 	}
-	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
+	level := slog.LevelWarn
+	if *logAll {
+		level = slog.LevelInfo
+	}
+	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
 	out := labFile{Resolver: dns.Addr(), CA: caFile, Orgs: map[string]*labOrg{}, Invites: map[string]string{}}
 	var list []*labOrg
 	for _, domain := range strings.Split(*orgs, ",") {

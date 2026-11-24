@@ -1,19 +1,23 @@
 // Mohur desktop app, main process. It owns the engine and the keys; the
 // window is sandboxed, has no Node, loads only the app's own files and
 // reaches the engine through the few calls preload.cjs exposes.
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, safeStorage, session, shell } from 'electron';
+import { app, BrowserWindow, crashReporter, dialog, ipcMain, Menu, nativeTheme, safeStorage, session, shell } from 'electron';
 import crypto from 'node:crypto';
+import { rmSync } from 'node:fs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Engine } from './core/engine.mjs';
 import { Net } from './core/net.mjs';
+import { parsePolicy, POLICIES } from './core/policy.mjs';
 import { Vault } from './core/vault.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const rendererDir = path.join(here, 'renderer');
 const indexURL = pathToFileURL(path.join(rendererDir, 'index.html')).href;
+// The privacy page and terms of use ship with the app (docs/policies).
+const policyDir = app.isPackaged ? path.join(process.resourcesPath, 'policies') : path.join(here, '..', '..', 'docs', 'policies');
 
 // --profile=name keeps a separate person on the same computer (for trying two
 // people side by side). Names are letters and digits only.
@@ -21,7 +25,17 @@ const profileArg = process.argv.find((a) => a.startsWith('--profile='));
 const profile = profileArg ? profileArg.slice(10).replace(/[^a-zA-Z0-9]/g, '').slice(0, 32) : '';
 if (profile) app.setPath('userData', path.join(app.getPath('appData'), 'Mohur', 'profiles', profile));
 
-if (!app.requestSingleInstanceLock()) app.quit();
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  // Crashes stay on this computer. The crash reporter catches them before
+  // Windows Error Reporting can, sends nothing, and what it wrote is deleted
+  // at the next start: a crash dump can hold parts of open messages.
+  const crashDir = path.join(app.getPath('userData'), 'Crashpad');
+  try { rmSync(crashDir, { recursive: true, force: true }); } catch { /* still in use; next start */ }
+  app.setPath('crashDumps', crashDir);
+  crashReporter.start({ uploadToServer: false, ignoreSystemCrashHandler: true });
+}
 
 let win = null;
 let engine = null;
@@ -104,6 +118,10 @@ function wire() {
   handle('block', (address) => engine.block(str(address, 300)));
   handle('unblock', (address) => engine.unblock(str(address, 300)));
   handle('report', ({ address, reason, note } = {}) => engine.report(str(address, 300), str(reason, 20), str(note || '', 4000)));
+  handle('policy', async (name) => {
+    if (!POLICIES.includes(name)) throw new Error('refused');
+    return parsePolicy(await fs.readFile(path.join(policyDir, name + '.md'), 'utf8'));
+  });
 }
 
 function harden() {

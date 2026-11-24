@@ -16,7 +16,9 @@
   receipts, files up to 100 MB, an encrypted local vault protected by the
   operating system, retry when a partner's server is away, unread counts that
   survive a restart, a Refresh button for the contact list, blocking a
-  person on this computer and reporting someone to one's own admin.
+  person on this computer and reporting someone to one's own admin, the
+  privacy page and terms of use shown in the app (joining accepts them),
+  and crash reports that stay on the computer and go at the next start.
 - **Tests**: Go end-to-end tests run three organizations over real TLS and DNS
   and check refusals: an unconnected organization, a replayed or altered
   request, an old request, a forged device certificate, a sender outside the
@@ -51,15 +53,21 @@
   messages and receipts, a 3 MB file, a restart, unread counts and their
   read marks (kept across a restart, odd addresses refused), blocking (nothing
   kept or answered, sending refused, kept across a restart, keys still in step
-  after unblocking), reports, the vault on disk, and a
+  after unblocking, no request sent), reports, the vault on disk, a
+  search of both servers' databases, files and log for a message, a file
+  and a report note, and a
   certificate from the wrong organization; further tests check the
   organization check, invite parsing and that sessions are post-quantum.
+  The store deletes collected mail at once and mail and files after 30 days.
+  The policies use only what the app can show, every promise names a test
+  that exists, and the app holds no address of denyfirst's.
 - **Sabotage**: each of those checks was switched off in turn and a test
   failed every time, except the sender-domain check on delivery, which the
   device-certificate check already covers. The 17 partner-access and
   change-notice checks, the 13 admin-reset checks, the 10 chosen-only checks
-  the 9 refresh-limit and read-mark checks and the 21 blocking and report checks
-  were switched off the same way; each was caught.
+  the 9 refresh-limit and read-mark checks, the 21 blocking and report checks
+  and the 16 checks behind the privacy page's promises were switched off
+  the same way; each was caught.
 
 ## Not yet
 
@@ -67,7 +75,9 @@
   done; see [INSTALL.md](INSTALL.md)), automatic certificates, and real domains.
 - A Microsoft Store listing. The Windows package (MSIX) builds and installs;
   see [packaging/windows](../packaging/windows/README.md). Updates will come
-  from the Store.
+  from the Store. Still needed: the privacy page and terms on denyfirst's
+  website, a test organization for Microsoft's testers, and published hashes
+  of each release's files, so the Store build can be compared with a rebuild.
 - New signed prekeys over time (the first ones are kept), and a server-side
   retry queue for an unreachable partner (the app retries today).
 - More than one device per person, mobile apps, groups.

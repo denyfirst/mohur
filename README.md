@@ -21,6 +21,7 @@ Then people write to each other. Messages use the official libsignal library
 
 How it works and what it protects: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 Where it stands: [docs/STATUS.md](docs/STATUS.md).
+What each part keeps, and the terms of use: [docs/policies](docs/policies/README.md).
 
 ## Parts
 

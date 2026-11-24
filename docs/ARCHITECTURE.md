@@ -160,6 +160,18 @@ message, reach the server. An organization's
 admin can add a device for their own employee; the employee's partners then see
 the new-device notice, so it cannot happen silently.
 
+## Privacy page, terms and crashes
+
+What each part keeps, Mohur's promises and the terms of use are in
+[docs/policies](policies/README.md). The app ships both pages and shows them
+itself from the join screen and the empty conversation view, so it holds no
+address of denyfirst's and never connects anywhere to show them. Joining
+accepts the terms.
+
+The app starts Electron's crash reporter with uploading off, so a crash is
+caught before Windows Error Reporting can send it. A crash dump can hold parts
+of open messages; it stays on the computer and is deleted at the next start.
+
 ## Admin access
 
 An admin signs in with a password (Argon2id) and an authenticator code, or a

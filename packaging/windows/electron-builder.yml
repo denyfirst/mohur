@@ -15,6 +15,11 @@ files:
   - "!test/**"
   # One processor per package: the x64 build carries only the x64 library.
   - "!node_modules/@signalapp/libsignal-client-win32/prebuilds/win32-arm64/**"
+# The privacy page and terms of use, which the app shows from these files.
+extraResources:
+  - from: ../docs/policies
+    to: policies
+    filter: [privacy.md, terms.md]
 # The current Windows SDK tools (10.0.26100); the default bundle is too old to
 # sign MSIX on Windows 11. Checksums are pinned inside electron-builder.
 toolsets:

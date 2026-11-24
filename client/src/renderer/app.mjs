@@ -276,7 +276,43 @@ async function toggleBlock() {
   } catch (e) { toast(e.message, 'bad'); }
 }
 
+// ── The privacy page and terms of use, as shipped with the app ──
+
+const policyTags = { h1: 'h1', h2: 'h2', h3: 'h3', p: 'p' };
+
+function inlineNodes(parts) {
+  return parts.map((p) => {
+    if (p.t === 'b') return el('strong', {}, p.v);
+    if (p.t === 'code') return el('code', {}, p.v);
+    if (p.t === 'link') {
+      const where = p.href.replace(/^https:\/\//, '').replace(/\/$/, '');
+      return el('span', { title: p.href }, p.v, where === p.v ? null : el('span', { class: 'url' }, ` (${where})`));
+    }
+    return document.createTextNode(p.v);
+  });
+}
+
+async function openPolicy(name) {
+  try {
+    const blocks = await m.policy(name);
+    const nodes = blocks.map((b, i) => (b.t === 'ul'
+      ? el('ul', {}, ...b.items.map((item) => el('li', {}, ...inlineNodes(item))))
+      : policyTags[b.t] && el(policyTags[b.t], i === 0 ? { id: 'policy-title' } : {}, ...inlineNodes(b.inline))));
+    $('policy-body').replaceChildren(...nodes.filter(Boolean));
+    $('policy-dialog').showModal();
+    $('policy-body').scrollTop = 0;
+  } catch (e) {
+    if (snap.joined) toast(e.message, 'bad');
+    else { $('join-notice').textContent = e.message; $('join-notice').dataset.kind = 'bad'; }
+  }
+}
+
 function wire() {
+  document.addEventListener('click', (ev) => {
+    const b = ev.target.closest('[data-policy]');
+    if (b) openPolicy(b.dataset.policy);
+  });
+  $('policy-close').addEventListener('click', () => $('policy-dialog').close());
   $('join-invite').addEventListener('input', () => {
     checked = null;
     $('join-found').hidden = true;

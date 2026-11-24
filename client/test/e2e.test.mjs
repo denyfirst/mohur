@@ -16,12 +16,19 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mohur-e2e-'));
 let lab;
 let labProc;
+let labLog = '';
 
 before(async () => {
   const exe = path.join(tmp, process.platform === 'win32' ? 'mohur-lab.exe' : 'mohur-lab');
   execFileSync('go', ['build', '-o', exe, './cmd/mohur-lab'], { cwd: root, stdio: 'inherit', env: { ...process.env, GOTOOLCHAIN: process.env.GOTOOLCHAIN || 'go1.27.4' } });
-  labProc = spawn(exe, ['-dir', path.join(tmp, 'lab'), '-orgs', 'alpha.e2e.test,beta.e2e.test', '-invite', 'alpha.e2e.test:aylin:Aylin Məmmədova', '-invite', 'beta.e2e.test:kamran:Kamran Əliyev',
-    '-invite', 'beta.e2e.test:leyla:Leyla Həsənova'], { stdio: ['pipe', 'pipe', 'inherit'] });
+  labProc = spawn(exe, ['-dir', path.join(tmp, 'lab'), '-log-all', '-orgs', 'alpha.e2e.test,beta.e2e.test', '-invite', 'alpha.e2e.test:aylin:Aylin Məmmədova', '-invite', 'beta.e2e.test:kamran:Kamran Əliyev',
+    '-invite', 'beta.e2e.test:leyla:Leyla Həsənova'], { stdio: ['pipe', 'pipe', 'pipe'] });
+  // The servers log every event, as mohurd does. The log is kept to check it
+  // later; warnings are still shown.
+  labProc.stderr.on('data', (c) => {
+    labLog += c;
+    for (const line of String(c).split('\n')) if (line && !line.includes('level=INFO')) process.stderr.write(line + '\n');
+  });
   await new Promise((resolve, reject) => {
     let out = '';
     labProc.stdout.on('data', (c) => { out += c; if (out.includes('READY')) resolve(); });
@@ -42,7 +49,7 @@ async function engine(name) {
   return new Engine(vault, net, { label: name + "'s laptop" });
 }
 
-let aylin, kamran;
+let aylin, kamran, fileData;
 
 test('an invite shows the verified organization, then joins once', async () => {
   aylin = await engine('aylin');
@@ -84,7 +91,7 @@ test('a message, its delivery receipt and a reply', async () => {
 });
 
 test('a file arrives whole and is checked before it opens', async () => {
-  const data = crypto.randomBytes(3 * 1024 * 1024 + 17);
+  const data = fileData = crypto.randomBytes(3 * 1024 * 1024 + 17);
   await aylin.sendFile('kamran@beta.e2e.test', { name: 'contract.pdf', type: 'application/pdf', data });
   await kamran.pollOnce();
   const msg = kamran.snapshot().convs['aylin@alpha.e2e.test'].at(-1);
@@ -144,7 +151,13 @@ test('unread messages are counted until read, and the mark survives a restart', 
 
 test("a blocked person's messages are neither kept nor answered", async () => {
   const aylinFor = () => kamran.snapshot().people.find((x) => x.address === 'aylin@alpha.e2e.test');
+  // Blocking asks nothing of any server.
+  const requests = [];
+  const request = kamran.net.request;
+  kamran.net.request = (...args) => { requests.push(args[1]); return request.apply(kamran.net, args); };
   await kamran.block('aylin@alpha.e2e.test');
+  kamran.net.request = request;
+  assert.deepEqual(requests, [], 'blocking reached a server');
   assert.equal(aylinFor().blocked, true);
   // The block is on disk at once, before anything else saves the vault.
   kamran = await engine('kamran');
@@ -164,7 +177,10 @@ test("a blocked person's messages are neither kept nor answered", async () => {
   // The block survives a restart; unblocking finds the keys still in step.
   kamran = await engine('kamran');
   assert.equal(aylinFor().blocked, true);
+  kamran.net.request = (...args) => { requests.push(args[1]); return request.apply(kamran.net, args); };
   await kamran.unblock('aylin@alpha.e2e.test');
+  kamran.net.request = request;
+  assert.deepEqual(requests, [], 'unblocking reached a server');
   assert.equal(aylinFor().blocked, false);
   await aylin.sendText('kamran@beta.e2e.test', 'after the block');
   while (await kamran.pollOnce() > 0) { /* drain */ }
@@ -203,6 +219,35 @@ test('the vault on disk holds no readable message text or keys', async () => {
   assert.equal(raw.includes(Buffer.from('kamran@beta.e2e.test')), false);
   const wrongKey = await Vault.open(path.join(tmp, 'kamran', 'vault.bin'), async () => crypto.randomBytes(32)).catch((e) => e);
   assert.ok(wrongKey instanceof Error);
+});
+
+test('the servers keep and log no message text, file name or file content', async () => {
+  // Everything both servers wrote: databases, stored files and their log.
+  const files = [];
+  const walk = (dir) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) walk(p);
+      else files.push(p);
+    }
+  };
+  walk(path.join(tmp, 'lab'));
+  assert.ok(files.some((p) => p.endsWith('.db')), 'found the servers\' databases');
+  const secrets = [Buffer.from('Müqaviləni'), Buffer.from('while blocked'), Buffer.from('contract.pdf'), fileData.subarray(4096, 4160), Buffer.from('Testing the report button')];
+  // Each also as base64 and base64url at every alignment, as JSON stores bytes.
+  const forms = (s) => [s, ...[0, 1, 2].flatMap((o) => {
+    const enc = Buffer.concat([Buffer.alloc(o), s]).toString('base64').slice(Math.ceil(o * 8 / 6), Math.floor((o + s.length) * 8 / 6));
+    return [Buffer.from(enc), Buffer.from(enc.replace(/\+/g, '-').replace(/\//g, '_'))];
+  })];
+  const named = (s) => (s.length === 64 ? 'file bytes' : String(s));
+  const log = Buffer.from(labLog);
+  assert.ok(log.includes('level=INFO'), 'the servers logged their events');
+  for (const s of secrets) {
+    for (const f of forms(s)) {
+      for (const p of files) assert.equal(fs.readFileSync(p).includes(f), false, `${path.relative(tmp, p)} holds ${named(s)}`);
+      assert.equal(log.includes(f), false, 'the servers logged ' + named(s));
+    }
+  }
 });
 
 let leyla;
