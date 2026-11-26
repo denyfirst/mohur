@@ -172,6 +172,26 @@ The app starts Electron's crash reporter with uploading off, so a crash is
 caught before Windows Error Reporting can send it. A crash dump can hold parts
 of open messages; it stays on the computer and is deleted at the next start.
 
+## Updates
+
+denyfirst signs each release's `SHA256SUMS` with its release key, as
+`ssh-keygen -Y sign` does; the key is in `.allowed_signers` and compiled
+into `mohurd`. `internal/sshsig` reads the signature format strictly and
+verifies with `crypto/ed25519`.
+
+The admin's Server page shows the running version. The server asks GitHub for
+the latest release list only when an admin presses **Check now**, or once a
+day, at a random hour, after an admin turns that on; it is off by default. A
+check reaches only public addresses on port 443 and follows redirects only
+within GitHub, carries nothing about the organization, and believes a list
+only when the signature verifies. A newer version is shown on every admin
+page and installed by nothing but the operator's `sudo mohurd upgrade`. That
+command installs only a newer release whose hash is on the verified list,
+keeps the running binary as `mohurd.previous`, renames the new one into
+place, restarts every running `mohurd` unit, and puts the previous binary
+back if one does not come up. The desktop app is updated by the Microsoft
+Store and has no update code.
+
 ## Admin access
 
 An admin signs in with a password (Argon2id) and an authenticator code, or a

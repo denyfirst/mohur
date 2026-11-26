@@ -1,0 +1,14 @@
+# Keys trusted to sign denyfirst releases, Mohur's among them.
+#
+# Anyone can check a release with it:
+#   ssh-keygen -Y verify -f .allowed_signers -I releases@denyfirst.dev \
+#              -n file -s SHA256SUMS.sig < SHA256SUMS
+#
+# mohurd carries the same key compiled in (internal/updates.ReleaseKey; a test
+# holds the two equal) and believes a release list only if this key signed it.
+#
+# This key is not the one that pushes to GitHub, and GitHub does not hold a
+# copy: signing happens on the maintainer's machine. If that ever changes,
+# this file changes with it, and its history is the record of when.
+
+releases@denyfirst.dev namespaces="file" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDD7Ie9zRf76RynH052/Abkv5k2nzosQd2DihyQMixVR denyfirst releases

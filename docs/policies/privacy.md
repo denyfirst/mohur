@@ -1,6 +1,6 @@
 # Mohur privacy
 
-Last changed 24 November 2026.
+Last changed 26 November 2026.
 
 Mohur lets people at organizations that each run their own server write to each other, end to end encrypted. It is two programs: the Mohur app for Windows, and the Mohur server, `mohurd`, which each organization runs for itself. denyfirst writes both and publishes them as free software under the AGPL-3.0. denyfirst runs no Mohur server for you.
 
@@ -12,6 +12,7 @@ denyfirst's own promises hold for Mohur as for everything it publishes. They are
 - **Partner organizations** that your admin connected run their own servers. They receive what is needed to deliver your messages to their people, and nothing more.
 - **denyfirst** writes the software. It receives nothing from your app or from your organization's server.
 - **Microsoft** delivers the app through the Microsoft Store, under its own privacy statement.
+- **GitHub** hosts the server's releases. It sees a server's address when that server looks for or downloads a release.
 
 ## What Mohur promises
 
@@ -53,6 +54,12 @@ A server keeps an encrypted message until the recipient's app collects it, and a
 
 **How you check it.** The store's test `TestMailAndFilesGoAfterThirtyDays`. ID: `mohur-mail-goes-after-30-days`.
 
+### The server looks for updates only when asked, and installs nothing by itself
+
+The server asks GitHub for the latest release list only when an admin presses Check now, or once a day if an admin turns that on. The request carries nothing about your organization. A newer release is shown to the admin, and installed only when the server's operator runs `mohurd upgrade`, which checks denyfirst's signature and the file's hash first.
+
+**How you check it.** The tests `TestTheDailyUpdateCheckIsOffUntilChosen`, `TestTheDailyCheckRunsOnlyWhileItIsOn` and `TestUpgradeRefusesAnythingItCannotVerify`. ID: `mohur-updates-only-when-asked`.
+
 ## On your computer
 
 - The app keeps your keys, your conversations, how far you have read them and whom you blocked in one encrypted file. Its key is protected by Windows for your Windows account.
@@ -77,6 +84,11 @@ A server keeps an encrypted message until the recipient's app collects it, and a
 The server sees who writes to whom, when, and how large each message is. It never sees what is written. Your organization's admin sees the People, Partners and Reports pages. In the database, the organization's key, the admins' authenticator secrets and report notes are sealed with a key kept in a separate file, so a copy of the database alone does not reveal them.
 
 Your admin can reset your device, so that you, or someone else, can join again as you. Everyone you write with then sees that your device changed, so it cannot happen unnoticed, and messages from before stay on the old device.
+
+## Updates
+
+- The Microsoft Store updates the app; see below.
+- The server looks for a newer release only as the promise above says. GitHub sees the server's address when it asks, and again when `mohurd upgrade` downloads a release.
 
 ## What a partner's server receives
 

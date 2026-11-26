@@ -11,7 +11,10 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -20,7 +23,12 @@ import (
 	"github.com/denyfirst/mohur/internal/discover"
 	"github.com/denyfirst/mohur/internal/server"
 	"github.com/denyfirst/mohur/internal/store"
+	"github.com/denyfirst/mohur/internal/updates"
 )
+
+// version is set by the release build (-X main.version=vX.Y.Z); anything else
+// is a development build, which update checks never call behind.
+var version = "dev"
 
 func main() {
 	if err := run(); err != nil {
@@ -30,8 +38,16 @@ func main() {
 }
 
 func run() error {
-	if len(os.Args) > 1 && os.Args[1] == "reset-admin" {
-		return resetAdmin(os.Args[2:])
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "reset-admin":
+			return resetAdmin(os.Args[2:])
+		case "upgrade":
+			return upgrade(os.Args[2:])
+		case "version":
+			fmt.Println(version)
+			return nil
+		}
 	}
 	var (
 		dataDir      = flag.String("data", "/var/lib/mohur", "directory for the database and encrypted files")
@@ -45,7 +61,7 @@ func run() error {
 	)
 	flag.Usage = func() {
 		out := flag.CommandLine.Output()
-		fmt.Fprint(out, "Usage: mohurd [options]\n       mohurd reset-admin [-instance-key file]\n\nreset-admin prints a one-time code that lets the admin set a new password\nand authenticator, while the server keeps running.\n\nOptions:\n")
+		fmt.Fprint(out, "Usage: mohurd [options]\n       mohurd reset-admin [-instance-key file]\n       mohurd upgrade\n       mohurd version\n\nreset-admin prints a one-time code that lets the admin set a new password\nand authenticator, while the server keeps running.\n\nupgrade installs the latest signed release, as root, after checking its\nsignature and hash, and restarts mohurd; the previous binary is kept.\n\nOptions:\n")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -85,6 +101,10 @@ func run() error {
 		return fmt.Errorf("TLS certificate: %w", err)
 	}
 	srv := server.New(st, disc, log)
+	// Update checks ask GitHub only when an admin presses Check now, or daily
+	// once an admin turns that on.
+	upd := &updates.Service{Checker: &updates.Checker{}, Settings: st, Running: version}
+	srv.SetUpdates(upd)
 	hs := &http.Server{
 		Addr:              *listen,
 		Handler:           srv.Handler(),
@@ -97,13 +117,14 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	go srv.Run(ctx)
+	go upd.Run(ctx)
 	go func() {
 		<-ctx.Done()
 		shut, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		_ = hs.Shutdown(shut)
 	}()
-	log.Info("mohurd listening", "addr", *listen)
+	log.Info("mohurd listening", "addr", *listen, "version", version)
 	if err := hs.ListenAndServeTLS("", ""); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
@@ -180,4 +201,56 @@ func resetAdmin(args []string) error {
 	}
 	fmt.Printf("\nOpen this server's sign-in page, choose \"Forgot your password?\" and enter this code:\n\n    %s\n\nIt works once, within an hour. It lets the admin set a new password and authenticator.\n\n", group(code))
 	return nil
+}
+
+// upgrade installs the latest signed release over this binary and restarts
+// every running mohurd service, putting the old binary back if they do not
+// come up.
+func upgrade(args []string) error {
+	if len(args) != 0 {
+		return errors.New("upgrade takes no arguments")
+	}
+	if runtime.GOOS != "linux" {
+		return errors.New("upgrade runs on the Linux server")
+	}
+	if os.Geteuid() != 0 {
+		return errors.New("upgrade replaces the server program: run it with sudo")
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	if exe, err = filepath.EvalSymlinks(exe); err != nil {
+		return err
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	u := &updates.Upgrader{
+		Checker: &updates.Checker{}, Running: version, Exe: exe, Arch: runtime.GOARCH, Out: os.Stdout,
+		Units:   runningUnits,
+		Restart: func(unit string) error { return exec.CommandContext(ctx, "systemctl", "restart", unit).Run() }, // #nosec G204 -- unit names are checked by updates.ValidUnit
+		Active: func(unit string) bool {
+			return exec.CommandContext(ctx, "systemctl", "is-active", "--quiet", unit).Run() == nil // #nosec G204 -- as above
+		},
+	}
+	err = u.Run(ctx)
+	if errors.Is(err, updates.ErrUpToDate) {
+		return nil
+	}
+	return err
+}
+
+// runningUnits lists the active systemd services named mohurd or mohurd-*.
+func runningUnits() ([]string, error) {
+	out, err := exec.Command("systemctl", "list-units", "--type=service", "--state=active", "--plain", "--no-legend", "--no-pager", "mohurd*.service").Output()
+	if err != nil {
+		return nil, err
+	}
+	var units []string
+	for _, line := range strings.Split(string(out), "\n") {
+		if f := strings.Fields(line); len(f) > 0 && updates.ValidUnit(f[0]) {
+			units = append(units, f[0])
+		}
+	}
+	return units, nil
 }

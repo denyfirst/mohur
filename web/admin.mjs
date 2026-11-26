@@ -68,7 +68,7 @@ function drawQR(svg, rows) {
 
 // ── Views ────────────────────────────────────────────────────────────────
 
-const pages = { '/': 'overview', '/people': 'people', '/partners': 'partners', '/reports': 'reports', '/domain': 'domain' };
+const pages = { '/': 'overview', '/people': 'people', '/partners': 'partners', '/reports': 'reports', '/domain': 'domain', '/server': 'server' };
 
 function showOnly(id) {
   for (const v of ['setup', 'signin', 'reset', 'workspace']) $(v).hidden = v !== id;
@@ -99,6 +99,7 @@ async function load() {
   $('rail-admin').textContent = state.admin;
   $('rail-domain-warn').hidden = Boolean(state.org && state.org.dnsChecked);
   openReports(state.openReports || 0);
+  showUpdate(state.newerRelease || '');
   await route();
 }
 
@@ -116,9 +117,44 @@ async function route() {
     if (page === 'partners') await partners();
     if (page === 'reports') await reports();
     if (page === 'domain') domain();
+    if (page === 'server') await server();
   } catch (e) {
     notice($('page-' + page), e.message, 'bad');
   }
+}
+
+// ── This server: version and updates ────────────────────────────────────
+
+// showUpdate marks the rail and the overview when a newer release is out.
+function showUpdate(latest) {
+  $('rail-update').hidden = !latest;
+  $('ov-update').hidden = !latest;
+  $('ov-update-text').textContent = latest ? `Mohur ${latest} is out.` : '';
+}
+
+function drawServer(u) {
+  const page = $('page-server');
+  $('upd-running').textContent = u.running && u.running !== 'dev' ? u.running : 'A development build';
+  $('upd-latest').replaceChildren(u.latest ? u.latest : el('span', { class: 'sub' }, u.available ? 'Not checked yet' : 'Update checks are not set up on this server'));
+  $('upd-checked').textContent = u.checkedAt ? when(u.checkedAt) : '—';
+  $('upd-check').disabled = !u.available;
+  $('upd-daily').disabled = !u.available;
+  $('upd-daily').checked = Boolean(u.daily);
+  $('upd-new').hidden = !u.newer;
+  if (u.newer) {
+    $('upd-new-title').textContent = `Mohur ${u.latest} is out. This server runs ${u.running}.`;
+    $('upd-command').textContent = u.command;
+    // Only the release page on GitHub is ever linked.
+    $('upd-release').href = /^https:\/\/github\.com\/denyfirst\/mohur\/releases\/tag\/v\d+\.\d+\.\d+$/.test(u.release) ? u.release : 'https://github.com/denyfirst/mohur/releases';
+  }
+  showUpdate(u.newer ? u.latest : '');
+  if (u.tampered) notice(page, u.error, 'bad');
+  else if (u.error) notice(page, u.error, 'warn');
+  else notice(page, '');
+}
+
+async function server() {
+  drawServer(await api('updates'));
 }
 
 async function overview() {
@@ -647,6 +683,25 @@ function wire() {
     } catch (e) { notice($('connect-dialog'), e.message, 'bad'); }
   });
 
+  $('upd-check').addEventListener('click', async () => {
+    notice($('page-server'), 'Asking GitHub for the latest signed release list…');
+    try {
+      const u = await api('updates/check', {});
+      drawServer(u);
+      if (!u.error) notice($('page-server'), u.newer ? `Mohur ${u.latest} is out.` : 'This server runs the latest release.', u.newer ? 'warn' : 'good');
+    } catch (e) { notice($('page-server'), e.message, 'bad'); }
+  });
+  $('upd-daily').addEventListener('change', async (ev) => {
+    const on = ev.target.checked;
+    try {
+      const u = await api('updates/daily', { daily: on });
+      drawServer(u);
+      if (!u.error) notice($('page-server'), on ? 'This server now checks once a day.' : 'The daily check is off. It asks only when you press Check now.', 'good');
+    } catch (e) {
+      ev.target.checked = !on;
+      notice($('page-server'), e.message, 'bad');
+    }
+  });
   $('dom-check').addEventListener('click', async () => {
     notice($('page-domain'), 'Checking, as a partner would…');
     try {

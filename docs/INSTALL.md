@@ -9,11 +9,20 @@ Mohur runs on a Linux x86-64 server with systemd, such as Ubuntu 24.04.
 - A TLS certificate for that name and its key, as PEM files. Rootwell,
   certbot or your provider can make them. When the certificate file changes,
   Mohur uses the new one within a minute; no restart is needed.
-- The `mohurd` binary for Linux:
+- The `mohurd` binary for Linux, from the
+  [latest release](https://github.com/denyfirst/mohur/releases/latest):
+  `mohurd_vX.Y.Z_linux_amd64` (or `_arm64`), with `SHA256SUMS` and
+  `SHA256SUMS.sig`. Check that denyfirst signed the list and that the file
+  is on it, with this repository's `.allowed_signers`:
 
   ```sh
-  GOOS=linux GOARCH=amd64 go build -trimpath -o mohurd ./cmd/mohurd
+  ssh-keygen -Y verify -f .allowed_signers -I releases@denyfirst.dev \
+    -n file -s SHA256SUMS.sig < SHA256SUMS
+  sha256sum --check --ignore-missing SHA256SUMS
+  mv mohurd_*_linux_amd64 mohurd
   ```
+
+  Or build it yourself; [RELEASING.md](RELEASING.md) builds the same bytes.
 
 ## Install
 
@@ -49,13 +58,28 @@ Options for special networks, at first install only:
 | `/var/lib/mohur/` | The database and encrypted files in transit |
 | `mohurd.service` | Runs as the `mohur` account, sandboxed by systemd |
 
-## Upgrade
+## Updates
+
+The admin's **Server** page shows which release runs and, when asked, whether
+a newer one is out. **Check now** asks GitHub for the latest release list;
+**Check once a day** does it daily, and is off until an admin turns it on.
+GitHub sees the server's address and nothing else. A newer release is shown
+on every page, never installed by itself.
+
+To upgrade, on the server:
 
 ```sh
-sudo sh install.sh --binary=./mohurd
+sudo mohurd upgrade
 ```
 
-Data, keys and settings stay as they are.
+It fetches the latest release list, checks denyfirst's signature and the
+file's hash, keeps the current program as `/usr/local/bin/mohurd.previous`,
+replaces it and restarts every running `mohurd` service. If a service does
+not come back, the previous program is put back and restarted. Data, keys
+and settings stay as they are.
+
+Without internet access on the server, check a release elsewhere as under
+"You need", copy it over and run `sudo sh install.sh --binary=./mohurd`.
 
 ## If the admin cannot sign in
 

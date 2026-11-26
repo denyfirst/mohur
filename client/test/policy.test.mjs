@@ -35,7 +35,7 @@ test('every promise says how to check it, and the tests it names exist', () => {
     if (blocks[i].t === 'h3') promises.push({ title: text(blocks[i].inline), body: [] });
     else if (promises.length) promises.at(-1).body.push(blocks[i]);
   }
-  assert.equal(promises.length, 6);
+  assert.equal(promises.length, 7);
   const sources = [];
   const walk = (dir) => {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
