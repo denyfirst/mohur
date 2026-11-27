@@ -20,6 +20,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/denyfirst/mohur/internal/autotls"
 	"github.com/denyfirst/mohur/internal/discover"
 	"github.com/denyfirst/mohur/internal/server"
 	"github.com/denyfirst/mohur/internal/store"
@@ -53,8 +54,9 @@ func run() error {
 		dataDir      = flag.String("data", "/var/lib/mohur", "directory for the database and encrypted files")
 		keyFile      = flag.String("instance-key", "/etc/mohur/instance.key", "file holding the 32-byte instance key; created if missing")
 		listen       = flag.String("listen", ":443", "HTTPS listen address")
-		certFile     = flag.String("cert", "/etc/mohur/tls/fullchain.pem", "TLS certificate chain (PEM); re-read when it changes")
-		certKeyFile  = flag.String("cert-key", "/etc/mohur/tls/privkey.pem", "TLS private key (PEM)")
+		autoCert     = flag.String("auto-cert", "", "get and renew the TLS certificate for this name from Let's Encrypt; the name must point at this server, with port 443 open")
+		certFile     = flag.String("cert", "", "TLS certificate chain (PEM), instead of -auto-cert; re-read when it changes")
+		certKeyFile  = flag.String("cert-key", "", "the private key of -cert (PEM)")
 		resolver     = flag.String("resolver", "", "DNS server host:port for partner lookups; empty uses the system resolver")
 		extraCA      = flag.String("extra-ca", "", "PEM file of extra certificate authorities to trust for partner servers")
 		allowPrivate = flag.Bool("allow-private-partners", false, "allow partner servers on private or loopback addresses")
@@ -96,9 +98,9 @@ func run() error {
 		fmt.Fprintf(os.Stderr, "\nMohur is not set up yet. Open this server in a browser and enter the setup code:\n\n    %s\n\nIt works for 24 hours and once only.\n\n", group(code))
 	}
 
-	certs := &certReloader{certFile: *certFile, keyFile: *certKeyFile}
-	if _, err := certs.get(); err != nil {
-		return fmt.Errorf("TLS certificate: %w", err)
+	tlsConfig, renew, err := serverTLS(*autoCert, *certFile, *certKeyFile, st, log)
+	if err != nil {
+		return err
 	}
 	srv := server.New(st, disc, log)
 	// Update checks ask GitHub only when an admin presses Check now, or daily
@@ -108,7 +110,7 @@ func run() error {
 	hs := &http.Server{
 		Addr:              *listen,
 		Handler:           srv.Handler(),
-		TLSConfig:         &tls.Config{MinVersion: tls.VersionTLS12, GetCertificate: func(*tls.ClientHelloInfo) (*tls.Certificate, error) { return certs.get() }},
+		TLSConfig:         tlsConfig,
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       2 * time.Minute,
 		MaxHeaderBytes:    16 << 10,
@@ -118,6 +120,9 @@ func run() error {
 	defer stop()
 	go srv.Run(ctx)
 	go upd.Run(ctx)
+	if renew != nil {
+		go renew(ctx)
+	}
 	go func() {
 		<-ctx.Done()
 		shut, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -129,6 +134,29 @@ func run() error {
 		return err
 	}
 	return nil
+}
+
+// serverTLS chooses where the certificate comes from: Let's Encrypt, asked by
+// mohurd itself and kept renewed, or files the operator keeps renewed.
+// Exactly one is given. renew, when not nil, runs while the server does.
+func serverTLS(auto, certFile, keyFile string, st *store.Store, log *slog.Logger) (_ *tls.Config, renew func(context.Context), _ error) {
+	switch {
+	case auto != "" && (certFile != "" || keyFile != ""):
+		return nil, nil, errors.New("give -auto-cert, or -cert and -cert-key, not both")
+	case auto != "":
+		m, err := autotls.New(autotls.Config{Name: auto, Store: st, Log: log})
+		if err != nil {
+			return nil, nil, fmt.Errorf("-auto-cert: %w", err)
+		}
+		return m.TLSConfig(), m.Run, nil
+	case certFile == "" || keyFile == "":
+		return nil, nil, errors.New("give -auto-cert NAME, or -cert and -cert-key")
+	}
+	certs := &certReloader{certFile: certFile, keyFile: keyFile}
+	if _, err := certs.get(); err != nil {
+		return nil, nil, fmt.Errorf("TLS certificate: %w", err)
+	}
+	return &tls.Config{MinVersion: tls.VersionTLS12, GetCertificate: func(*tls.ClientHelloInfo) (*tls.Certificate, error) { return certs.get() }}, nil, nil
 }
 
 func group(code string) string {

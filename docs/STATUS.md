@@ -4,7 +4,9 @@
 
 ## Works, with tests
 
-- **Server (`mohurd`)**: first-run setup with a one-time code, admin sign-in
+- **Server (`mohurd`)**: a certificate from Let's Encrypt that the server gets
+  and renews itself, or the organization's own; first-run setup with a
+  one-time code, admin sign-in
   with password and authenticator code, an admin reset by the server's
   operator (`mohurd reset-admin`) for a forgotten password, the domain record and its **Check**,
   people and one-time invites, partners by domain (connect, accept, remove,
@@ -75,6 +77,17 @@
   mohurd units, keeps the previous binary and puts it back when a service
   does not come up; the admin calls refuse other sites, signed-out browsers
   and malformed choices.
+  Certificates: a test ACME server issues the certificate end to end, checking
+  the name over TLS-ALPN-01 against the running server; one certificate is
+  asked for the server's name, and none for other names or none; it is kept
+  sealed and served again after a restart without asking; Let's Encrypt is
+  reached only at public addresses on port 443, without redirects or a
+  proxy; why there is no certificate is said in plain words. The store refuses
+  odd names and sizes, and a value moved to another name, altered or opened
+  with another instance key. The server takes either a certificate of its own
+  or one from Let's Encrypt, never both. The Linux install lab also installs
+  with a certificate from Let's Encrypt that cannot be reached, and checks that
+  the install says why and still shows the setup code.
   App versions: an app gives its version on joining and signing in; it is
   recorded only after the device proves its key and only for its current
   device, compared as numbers, and never shown to colleagues or partners; a
@@ -93,15 +106,19 @@
   change-notice checks, the 13 admin-reset checks, the 10 chosen-only checks,
   the 9 refresh-limit and read-mark checks, the 21 blocking and report checks,
   the 16 checks behind the privacy page's promises, the 27 update checks, the
-  20 app-version checks and the 8 release-build and release-check checks were
-  switched off the same way; each was caught. For a newer Go than `go.mod`
-  names, `go.mod` was lowered in a throwaway copy with a newer Go on the path.
+  20 app-version checks, the 8 release-build and release-check checks and the
+  16 automatic-certificate checks were switched off the same way; each was
+  caught. For a newer Go than `go.mod` names, `go.mod` was lowered in a
+  throwaway copy with a newer Go on the path.
   A sabotage that no longer builds is not counted.
 
 ## Not yet
 
-- A test on two separate machines (the install script and its Linux lab are
-  done; see [INSTALL.md](INSTALL.md)), automatic certificates, and real domains.
+- A test on two separate machines with real domains (the install script and
+  its Linux lab are done; see [INSTALL.md](INSTALL.md)). The automatic
+  certificate has been tested against a test ACME server, not yet against
+  Let's Encrypt itself.
+- A proxy in front of the server.
 - A Microsoft Store listing. The Windows package (MSIX) builds and installs;
   see [packaging/windows](../packaging/windows/README.md). Updates will come
   from the Store. Still needed: the privacy page and terms on denyfirst's

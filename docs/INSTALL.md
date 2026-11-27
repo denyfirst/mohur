@@ -5,10 +5,12 @@ Mohur runs on a Linux x86-64 server with systemd, such as Ubuntu 24.04.
 ## You need
 
 - A name for the server under your domain, such as `mohur.example.com`,
-  pointing at the server, with port 443 open.
-- A TLS certificate for that name and its key, as PEM files. Rootwell,
-  certbot or your provider can make them. When the certificate file changes,
-  Mohur uses the new one within a minute; no restart is needed.
+  pointing at the server's public address (an `A` record, and `AAAA` for
+  IPv6), with port 443 open to the internet.
+- Nothing more for the certificate: Mohur gets one from Let's Encrypt for that
+  name and renews it by itself, which accepts the
+  [Let's Encrypt Subscriber Agreement](https://letsencrypt.org/repository/).
+  A certificate of your own can be used instead; see the options below.
 - The `mohurd` binary for Linux, from the
   [latest release](https://github.com/denyfirst/mohur/releases/latest):
   `mohurd_vX.Y.Z_linux_amd64` (or `_arm64`), with `SHA256SUMS` and
@@ -28,23 +30,31 @@ Mohur runs on a Linux x86-64 server with systemd, such as Ubuntu 24.04.
 
 ## Install
 
-Copy `mohurd`, `scripts/install.sh` and the certificate files to the server,
-then:
+Copy `mohurd` and `scripts/install.sh` to the server, then:
 
 ```sh
-sudo sh install.sh --binary=./mohurd --server=mohur.example.com \
-  --tls-cert=fullchain.pem --tls-key=privkey.pem
+sudo sh install.sh --binary=./mohurd --server=mohur.example.com
 ```
 
-It prints a one-time setup code. Open `https://mohur.example.com/`, enter the
-code, and follow the page: your organization, your admin account and an
-authenticator app. Then the Domain page shows the one DNS record to add.
+It starts Mohur, says whether the certificate came, and prints a one-time
+setup code. Open `https://mohur.example.com/`, enter the code, and follow the
+page: your organization, your admin account and an authenticator app. Then the
+Domain page shows the one DNS record to add.
 
-Options for special networks, at first install only:
+Without a certificate yet, the install says why in plain words: for example,
+that the name does not point at the server, or that Let's Encrypt could not
+connect on port 443. Mohur tries again by itself after 2, 5 and 15 minutes,
+then every hour, and `journalctl -u mohurd` shows `certificate ready` once it
+has one. Let's Encrypt allows five failed checks of a name an hour.
+
+Mohur answers on port 443 itself. A proxy in front of it is not supported yet.
+
+Options, at first install only:
 
 | Option | When |
 |---|---|
-| `--listen=ADDR` | Another address or port than `:443` |
+| `--tls-cert=FILE --tls-key=FILE` | A certificate of your own and its key, as PEM files, instead of one from Let's Encrypt. They are copied to `/etc/mohur/tls/`, and Mohur reads them again within a minute after they change there, so whatever renews the certificate must copy the new files there. |
+| `--listen=ADDR` | Another address or port than `:443`. Let's Encrypt still connects to port 443, which must reach it. |
 | `--resolver=HOST:PORT` | Partners must be looked up through a private DNS server |
 | `--extra-ca=FILE` | Partners use certificates from a private authority |
 | `--allow-private-partners` | Partner servers are on private addresses, as in a lab |
@@ -54,8 +64,8 @@ Options for special networks, at first install only:
 | Path | What |
 |---|---|
 | `/usr/local/bin/mohurd` | The program |
-| `/etc/mohur/instance.key` | The key that seals the organization key in the database |
-| `/etc/mohur/tls/` | Your certificate and key |
+| `/etc/mohur/instance.key` | The key that seals the organization key and the certificate in the database |
+| `/etc/mohur/tls/` | Only with `--tls-cert`: your certificate and key |
 | `/etc/mohur/mohurd.conf` | The options above |
 | `/var/lib/mohur/` | The database and encrypted files in transit |
 | `mohurd.service` | Runs as the `mohur` account, sandboxed by systemd |
@@ -102,5 +112,7 @@ an hour.
 
 Copy `/var/lib/mohur` and, separately, `/etc/mohur/instance.key`. The
 database is useless without the instance key, and the instance key alone
-reveals nothing. Messages are not in the backup in readable form: servers
+reveals nothing. The Let's Encrypt certificate is in the database too, so a
+restored server does not ask for a new one. Messages are not in the backup in
+readable form: servers
 only ever hold ciphertext, and people's keys stay on their computers.

@@ -1,8 +1,9 @@
 #!/bin/sh
 # Installs mohurd with scripts/install.sh on this Linux host, as an operator
 # would, then checks it: refusals, file modes, HTTPS, the systemd sandbox, a
-# whole setup through the API, and an upgrade that keeps everything. CI runs
-# it on a fresh runner; do not run it on a host that matters (it uses sudo).
+# whole setup through the API, an upgrade that keeps everything, and a new host
+# whose certificate comes from Let's Encrypt. CI runs it on a fresh runner; do
+# not run it on a host that matters (it uses sudo).
 set -eu
 root="$(cd "$(dirname "$0")/.." && pwd)"
 work="$(mktemp -d)"
@@ -29,7 +30,11 @@ expect_refusal 'give --binary' --server=mohur.ci.test
 expect_refusal 'is not mohurd' --binary="${work}/fake" --server=mohur.ci.test --tls-cert="${work}/cert.pem" --tls-key="${work}/key.pem"
 expect_refusal 'is not mohurd' --binary=/bin/true --server=mohur.ci.test --tls-cert="${work}/cert.pem" --tls-key="${work}/key.pem"
 expect_refusal 'give --server' --binary="${work}/mohurd" --tls-cert="${work}/cert.pem" --tls-key="${work}/key.pem"
-expect_refusal 'give --tls-cert' --binary="${work}/mohurd" --server=mohur.ci.test
+expect_refusal 'give both --tls-cert and --tls-key' --binary="${work}/mohurd" --server=mohur.ci.test --tls-cert="${work}/cert.pem"
+expect_refusal 'give both --tls-cert and --tls-key' --binary="${work}/mohurd" --server=mohur.ci.test --tls-key="${work}/key.pem"
+expect_refusal 'without a port' --binary="${work}/mohurd" --server=mohur.ci.test:8443
+expect_refusal 'give --server=NAME' --binary="${work}/mohurd" --server=mohur
+expect_refusal 'give --server=NAME' --binary="${work}/mohurd" --server=mohur.ci.test.
 expect_refusal 'holds no PEM private key' --binary="${work}/mohurd" --server=mohur.ci.test --tls-cert="${work}/cert.pem" --tls-key="${work}/cert.pem"
 expect_refusal 'unknown option' --binary="${work}/mohurd" --server mohur.ci.test
 test ! -e /etc/mohur || fail 'a refused install left /etc/mohur behind'
@@ -82,4 +87,19 @@ expect_refusal 'upgrade takes only --binary' --binary="${work}/mohurd" --server=
 sudo sh scripts/install.sh --binary="${work}/mohurd"
 test "$(sudo sha256sum /etc/mohur/instance.key)" = "${before_key}" || fail 'the upgrade changed the instance key'
 test "$(curl_lab -o /dev/null -w '%{http_code}' "${url}/.well-known/mohur")" = 200 || fail 'the organization is gone after the upgrade'
+
+echo '--- a new host with a certificate from Let'\''s Encrypt, which cannot be reached'
+# Let's Encrypt is never asked from CI: its name is pointed at this host, and
+# mohurd asks only public addresses, so it says why it has no certificate.
+sudo systemctl disable --now mohurd.service >/dev/null 2>&1
+sudo rm -rf /etc/mohur /var/lib/mohur /etc/systemd/system/mohurd.service
+sudo systemctl daemon-reload
+echo '127.0.0.1 acme-v02.api.letsencrypt.org' | sudo tee -a /etc/hosts >/dev/null
+sudo sh scripts/install.sh --binary="${work}/mohurd" --server=mohur.ci.test --listen=127.0.0.1:8443 | tee "${work}/auto.out"
+grep -q 'Subscriber Agreement' "${work}/auto.out" || fail 'the install did not name the agreement'
+grep -q 'It has no certificate yet. This server could not reach Let'\''s Encrypt' "${work}/auto.out" || fail 'the install did not say why there is no certificate'
+sed -n 's/^ \{7\}\([A-Z2-7-]\{20,\}\)$/\1/p' "${work}/auto.out" | grep -q . || fail 'no setup code shown without a certificate'
+sudo grep -qx 'MOHURD_OPTIONS=-listen 127.0.0.1:8443 -auto-cert mohur.ci.test' /etc/mohur/mohurd.conf || { sudo cat /etc/mohur/mohurd.conf >&2; fail 'the options do not ask for a certificate'; }
+sudo test ! -e /etc/mohur/tls || fail 'a certificate directory without certificate files'
+systemctl is-active --quiet mohurd || fail 'mohurd stopped without a certificate'
 echo 'install lab passed'
