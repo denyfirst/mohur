@@ -27,8 +27,10 @@ and only a version newer than the one running.
    git push origin v0.1.0
    ```
 
-3. Build from the tag. Building twice, or on another machine, gives the same
-   hashes:
+3. Build from the tag. The script uses the Go that `go.mod` names and none
+   of the machine's own Go settings, so building twice, or on another
+   machine, gives the same hashes. CI builds on Linux and on Windows on every
+   change and requires the same bytes:
 
    ```powershell
    git checkout v0.1.0
@@ -51,9 +53,19 @@ and only a version newer than the one running.
      .work\release\v0.1.0\SHA256SUMS .work\release\v0.1.0\SHA256SUMS.sig
    ```
 
-6. On a test server: the Server page's **Check now** shows the release, and
+6. Publishing starts the **Reproduce** workflow. It builds the tag on a
+   GitHub runner and checks the release with `scripts/release-verify.sh`:
+   denyfirst's key signed the list, the release holds exactly the listed
+   files, and they are the bytes the tag builds. It must pass before anyone is
+   told about the release. To run it again:
+
+   ```powershell
+   gh workflow run reproduce.yml --repo denyfirst/mohur -f tag=v0.1.0
+   ```
+
+7. On a test server: the Server page's **Check now** shows the release, and
    `sudo mohurd upgrade` installs it and restarts the service.
-7. Build the Store package from the same tag with
+8. Build the Store package from the same tag with
    [packaging/windows](../packaging/windows/README.md), version `0.1.0.0`, and
    submit it in Partner Center.
 

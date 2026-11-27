@@ -80,13 +80,22 @@
   device, compared as numbers, and never shown to colleagues or partners; a
   missing or older version is asked to update, and a malformed or repeated
   one is refused.
+  Releases: CI builds the release on Linux and on Windows and requires the
+  same bytes, also with a machine's own Go settings in the way. The release
+  check accepts a signed release
+  that its tag builds and refuses one with no signature, signed by another
+  key or for something other than files, with a file changed after signing,
+  with an unlisted or a missing file, or whose signed list is not what the
+  tag builds.
 - **Sabotage**: each of those checks was switched off in turn and a test
   failed every time, except the sender-domain check on delivery, which the
   device-certificate check already covers. The 17 partner-access and
   change-notice checks, the 13 admin-reset checks, the 10 chosen-only checks,
   the 9 refresh-limit and read-mark checks, the 21 blocking and report checks,
-  the 16 checks behind the privacy page's promises, the 27 update checks and
-  the 20 app-version checks were switched off the same way; each was caught.
+  the 16 checks behind the privacy page's promises, the 27 update checks, the
+  20 app-version checks and the 8 release-build and release-check checks were
+  switched off the same way; each was caught. For a newer Go than `go.mod`
+  names, `go.mod` was lowered in a throwaway copy with a newer Go on the path.
   A sabotage that no longer builds is not counted.
 
 ## Not yet
@@ -98,9 +107,9 @@
   from the Store. Still needed: the privacy page and terms on denyfirst's
   website, a test organization for Microsoft's testers, and published hashes
   of each release's files, so the Store build can be compared with a rebuild.
-- The first release, and a public workflow that rebuilds each release and
-  compares its hashes. The server's update check and `mohurd upgrade` are
-  built; see [RELEASING.md](RELEASING.md).
+- The first release. The server's update check, `mohurd upgrade` and the
+  public Reproduce workflow, which rebuilds each release from its tag and
+  checks it, are built; see [RELEASING.md](RELEASING.md).
 - New signed prekeys over time (the first ones are kept), and a server-side
   retry queue for an unreachable partner (the app retries today).
 - More than one device per person, mobile apps, groups.

@@ -118,6 +118,90 @@ jobs:
           export GOTOOLCHAIN
           sh scripts/install-lab.sh
 
+  release-linux:
+    name: Release build on Linux
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    outputs:
+      sums: ${{ steps.build.outputs.sums }}
+    steps:
+      - name: Check out the exact event commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          git init -q
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          auth="$(printf 'x-access-token:%s' "${GH_TOKEN}" | base64 -w0)"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${auth}" \
+            fetch -q --depth 1 origin "${GITHUB_SHA}"
+          unset auth
+          git checkout -q FETCH_HEAD
+
+      - name: Build the release twice, once with a machine's own Go settings
+        id: build
+        run: |
+          set -eu
+          pwsh -NoProfile -File scripts/release-build.ps1 -Version v0.0.0 -DryRun
+          mv .work/release/v0.0.0 "${RUNNER_TEMP}/plain"
+          # Settings a maintainer's shell or `go env -w` might carry. Each
+          # changes the bytes, or breaks the build, if let through; the build
+          # must ignore them all. Go 1.21.0 stands for any Go but go.mod's.
+          mkdir -p "${RUNNER_TEMP}/config/go"
+          printf 'GOARM64=v9.0\nGOFIPS140=latest\n' > "${RUNNER_TEMP}/config/go/env"
+          XDG_CONFIG_HOME="${RUNNER_TEMP}/config" GOAMD64=v3 GOTOOLCHAIN=go1.21.0 CGO_ENABLED=1 GOFLAGS=-race \
+            pwsh -NoProfile -File scripts/release-build.ps1 -Version v0.0.0 -DryRun
+          diff -u "${RUNNER_TEMP}/plain/SHA256SUMS" .work/release/v0.0.0/SHA256SUMS
+          echo "sums=$(sha256sum < "${RUNNER_TEMP}/plain/SHA256SUMS" | cut -d' ' -f1)" >> "${GITHUB_OUTPUT}"
+
+      - name: Check that the release check refuses wrong releases
+        run: sh scripts/release-verify-test.sh "${RUNNER_TEMP}/plain"
+
+  release-windows:
+    name: Same release bytes on Windows
+    needs: release-linux
+    runs-on: windows-2025
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the exact event commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          git init -q
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          auth="$(printf 'x-access-token:%s' "${GH_TOKEN}" | base64 -w0)"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${auth}" \
+            fetch -q --depth 1 origin "${GITHUB_SHA}"
+          unset auth
+          git checkout -q FETCH_HEAD
+
+      # Windows PowerShell, as on the maintainer's machine, where releases are
+      # built and signed.
+      - name: Build the release
+        shell: powershell
+        run: |
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/release-build.ps1 -Version v0.0.0 -DryRun
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+      - name: Compare with the Linux build
+        shell: bash
+        env:
+          LINUX: ${{ needs.release-linux.outputs.sums }}
+        run: |
+          set -eu
+          have="$(sha256sum < .work/release/v0.0.0/SHA256SUMS | cut -d' ' -f1)"
+          if [ "${have}" != "${LINUX}" ]; then
+            echo "Windows built different bytes from Linux." >&2
+            exit 1
+          fi
+          echo "Windows and Linux built the same bytes."
+
   analysis:
     name: Static and vulnerability analysis
     runs-on: ubuntu-24.04
