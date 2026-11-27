@@ -21,15 +21,17 @@ import (
 	"github.com/denyfirst/mohur/internal/discover"
 	"github.com/denyfirst/mohur/internal/proto"
 	"github.com/denyfirst/mohur/internal/store"
+	"github.com/denyfirst/mohur/internal/updates"
 	"github.com/denyfirst/mohur/web"
 )
 
 // Server serves one organization.
 type Server struct {
-	st    *store.Store
-	disc  *discover.Verifier
-	log   *slog.Logger
-	clock atomic.Pointer[func() time.Time]
+	st      *store.Store
+	disc    *discover.Verifier
+	log     *slog.Logger
+	clock   atomic.Pointer[func() time.Time]
+	updates *updates.Service
 
 	mu        sync.Mutex
 	admins    map[[32]byte]adminSession
@@ -88,7 +90,7 @@ func (s *Server) Handler() http.Handler {
 
 	// Admin pages: one document; the script shows the right view.
 	mux.HandleFunc("GET /{$}", s.page)
-	for _, p := range []string{"/people", "/partners", "/reports", "/domain", "/signin", "/setup", "/reset"} {
+	for _, p := range []string{"/people", "/partners", "/reports", "/domain", "/server", "/signin", "/setup", "/reset"} {
 		mux.HandleFunc("GET "+p, s.page)
 	}
 	mux.Handle("GET /assets/", http.StripPrefix("/assets/", web.Assets()))
@@ -116,6 +118,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /admin/api/partners/access", s.admin(s.partnersAccess))
 	mux.HandleFunc("GET /admin/api/reports", s.admin(s.reportsList))
 	mux.HandleFunc("POST /admin/api/reports/close", s.admin(s.reportsClose))
+	mux.HandleFunc("GET /admin/api/updates", s.admin(s.updatesState))
+	mux.HandleFunc("POST /admin/api/updates/check", s.admin(s.updatesCheck))
+	mux.HandleFunc("POST /admin/api/updates/daily", s.admin(s.updatesDaily))
 
 	mux.HandleFunc("POST /api/v1/join", s.join)
 	mux.HandleFunc("POST /api/v1/session/challenge", s.sessionChallenge)

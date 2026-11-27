@@ -21,7 +21,7 @@ address of denyfirst's, so it never connects to the website to show them.
 - Mohur's entry in denyfirst's list of products:
   - Name: Mohur
   - What: Encrypted messages between organizations that each run their own server.
-  - Promises: the six under "What Mohur promises" in privacy.md, each with its
+  - Promises: the seven under "What Mohur promises" in privacy.md, each with its
     ID, its sentence and its "How you check it". They only narrow
     denyfirst's own promises and do not repeat them.
 - denyfirst's own promises are not copied here. privacy.md links to

@@ -1,6 +1,6 @@
 # Status
 
-24 November 2026. First working version; not released, no users.
+26 November 2026. First working version; not released, no users.
 
 ## Works, with tests
 
@@ -11,6 +11,9 @@
   accept a changed key), per-partner choice of who may write (no one until
   chosen, per partner or per person and in the invite, enforced by the server), the app API and signed federation
   between servers. Apps hear of changes to people and partners at once.
+  A Server page shows the running version and, on Check now or a daily
+  check an admin turns on, whether a newer signed release is out;
+  `sudo mohurd upgrade` installs it.
 - **Desktop app**: join with an invite after verifying the organization, a
   contact list of colleagues and partners, one-to-one messages with delivery
   receipts, files up to 100 MB, an encrypted local vault protected by the
@@ -61,13 +64,23 @@
   The store deletes collected mail at once and mail and files after 30 days.
   The policies use only what the app can show, every promise names a test
   that exists, and the app holds no address of denyfirst's.
+  Updates: a release list is believed only with denyfirst's signature
+  (checked against a real `ssh-keygen` signature, and refused when altered,
+  signed by another key or for another namespace, or malformed); checks
+  reach only GitHub on public addresses and port 443, are spaced a minute
+  apart, and run daily only once an admin turns that on; `mohurd upgrade`
+  installs only a newer release whose hash is on the list, restarts only
+  mohurd units, keeps the previous binary and puts it back when a service
+  does not come up; the admin calls refuse other sites, signed-out browsers
+  and malformed choices.
 - **Sabotage**: each of those checks was switched off in turn and a test
   failed every time, except the sender-domain check on delivery, which the
   device-certificate check already covers. The 17 partner-access and
   change-notice checks, the 13 admin-reset checks, the 10 chosen-only checks
   the 9 refresh-limit and read-mark checks, the 21 blocking and report checks
-  and the 16 checks behind the privacy page's promises were switched off
-  the same way; each was caught.
+  the 16 checks behind the privacy page's promises and the 27 update
+  checks were switched off the same way; each was caught. A sabotage that
+  no longer builds is not counted.
 
 ## Not yet
 
@@ -78,6 +91,11 @@
   from the Store. Still needed: the privacy page and terms on denyfirst's
   website, a test organization for Microsoft's testers, and published hashes
   of each release's files, so the Store build can be compared with a rebuild.
+- The first release, and a public workflow that rebuilds each release and
+  compares its hashes. The server's update check and `mohurd upgrade` are
+  built; see [RELEASING.md](RELEASING.md).
+- The app telling the server its version, so a server can ask for a newer
+  app and admins see who is behind.
 - New signed prekeys over time (the first ones are kept), and a server-side
   retry queue for an unreachable partner (the app retries today).
 - More than one device per person, mobile apps, groups.

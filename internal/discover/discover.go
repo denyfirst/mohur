@@ -117,6 +117,10 @@ func ParseRoots(pemBytes []byte) ([]*x509.Certificate, error) {
 	return certs, nil
 }
 
+// Public reports whether ip is an ordinary internet address: not loopback,
+// private, link-local, shared or unspecified.
+func Public(ip net.IP) bool { return public(ip) }
+
 func public(ip net.IP) bool {
 	return !(ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
 		ip.IsUnspecified() || ip.IsMulticast() || ip.IsInterfaceLocalMulticast() ||

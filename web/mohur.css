@@ -151,6 +151,8 @@ output.invite { margin: 16px 0 0; padding: 16px; font-size: 18px; letter-spacing
 output.codes { columns: 2; column-gap: 24px; font-size: 16px; line-height: 2; }
 .notice { min-height: 24px; margin: 16px 0 0; font-size: 14px; color: var(--ink); }
 .notice[data-kind="bad"] { color: var(--bad); }
+.notice[data-kind="warn"] { color: var(--warn); }
+.notice[data-kind="good"] { color: var(--good); }
 
 /* Pills say a state in words and a verdict colour. */
 .pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; font-size: 12px; font-weight: 650; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
@@ -225,6 +227,14 @@ output.codes { columns: 2; column-gap: 24px; font-size: 16px; line-height: 2; }
 .record dt { font-size: 14px; font-weight: 650; color: var(--ink-soft); }
 .record dd { display: flex; gap: 8px; align-items: center; margin: 0; min-width: 0; }
 .status-line { display: flex; gap: 12px; align-items: center; margin-top: 24px; font-size: 14px; }
+.status-line.first { margin-top: 0; }
+.status-line > button { margin-top: 0; }
+.record.terms { grid-template-columns: 96px minmax(0, 1fr); }
+.toggle { display: inline-flex; gap: 8px; align-items: center; margin: 0; font-size: 14px; font-weight: 600; color: var(--ink-soft); cursor: pointer; }
+.fine-print { margin: 16px 0 0; font-size: 13px; }
+.update-banner { display: flex; gap: 12px; align-items: center; margin: 0 0 20px; padding: 14px 18px; color: var(--ink); text-decoration: none; background: color-mix(in srgb, var(--warn) 7%, var(--card)); border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--rule)); border-radius: var(--r-l); }
+.update-banner .go { margin-left: auto; font-weight: 650; color: var(--link); }
+.update-banner:hover .go { text-decoration: underline; }
 
 dialog { width: min(100% - 32px, 480px); padding: 32px; color: var(--ink); background: var(--card); border: 1px solid var(--rule); border-radius: var(--r-l); box-shadow: var(--shadow-lg); }
 dialog::backdrop { background: rgba(8, 10, 14, 0.5); }

@@ -96,6 +96,9 @@ func (s *Server) adminState(w http.ResponseWriter, r *http.Request) {
 		out["admin"] = user
 		out["recoveryLeft"] = s.st.RecoveryLeft(user)
 		out["openReports"] = s.openReports()
+		if v := s.newerRelease(); v != "" {
+			out["newerRelease"] = v
+		}
 		if o, _, ok := s.org(); ok {
 			out["org"] = stateOrg{Name: o.Name, Domain: o.Domain, Server: o.Server, Key: proto.B64(o.Pub),
 				Record: proto.TXTValue(o.Server, o.Key()), RecordName: "_mohur." + o.Domain, DNSChecked: o.DNSChecked}

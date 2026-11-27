@@ -129,6 +129,7 @@
       <a class="rail-item" href="/partners" data-link data-page="partners"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="7" width="8" height="10" rx="2"/><rect x="13.5" y="7" width="8" height="10" rx="2"/><path d="M10.5 12h3"/></svg>Partners<span class="count" id="rail-requests" hidden></span></a>
       <a class="rail-item" href="/domain" data-link data-page="domain"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg>Domain<span class="dot-warn" id="rail-domain-warn" hidden></span></a>
       <a class="rail-item" href="/reports" data-link data-page="reports"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/></svg>Reports<span class="count" id="rail-reports" hidden></span></a>
+      <a class="rail-item" href="/server" data-link data-page="server"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="6.5" rx="1.5"/><rect x="3.5" y="13.5" width="17" height="6.5" rx="1.5"/><path d="M7 7.25h.01M7 16.75h.01"/></svg>Server<span class="dot-warn" id="rail-update" hidden title="A newer release is out"></span></a>
       <div class="rail-foot">
         <p class="who"><span id="rail-admin"></span></p>
         <button type="button" class="link-button" id="signout">Sign out</button>
@@ -139,6 +140,7 @@
 
   <main class="page" id="page-overview" hidden>
     <header class="page-head"><p class="eyebrow">Overview</p><h1 id="ov-name"></h1><p class="hint" id="ov-domain"></p></header>
+    <a class="update-banner" href="/server" data-link id="ov-update" hidden><span class="pill" data-kind="warn">Update</span><span id="ov-update-text"></span><span class="go">How to update</span></a>
     <section class="steps" aria-label="Getting started">
       <a class="step-card" href="/domain" data-link id="ov-step-domain"><span class="step-n">1</span><span><strong>Publish your domain record</strong><span class="sub">Partners find and verify you with it.</span></span><span class="pill" data-pill></span></a>
       <a class="step-card" href="/people" data-link id="ov-step-people"><span class="step-n">2</span><span><strong>Invite your people</strong><span class="sub">They join with the Mohur app.</span></span><span class="pill" data-pill></span></a>
@@ -170,6 +172,26 @@
     <header class="page-head"><p class="eyebrow">Reports</p><h1>Reports</h1><p class="hint">Your people can report someone they talk to from the app. A report holds who sent it, about whom, a reason and their own note. Messages stay encrypted between the two people, so they are never part of a report.</p></header>
     <ul class="rows" id="report-list"></ul>
     <p class="empty" id="report-empty" hidden>No reports. When someone reports a person from the app, it shows here.</p>
+    <p class="notice" role="status" data-notice></p>
+  </main>
+
+  <main class="page" id="page-server" hidden>
+    <header class="page-head"><p class="eyebrow">Server</p><h1>This server</h1><p class="hint">Which Mohur runs here, and whether a newer release is out. denyfirst signs every release, and this server believes a release list only when that signature verifies.</p></header>
+    <section class="card wide" id="upd-new" hidden>
+      <div class="status-line first"><span class="pill" data-kind="warn">Update</span><strong id="upd-new-title"></strong></div>
+      <p class="hint">On the server, run:</p>
+      <dl class="record"><dt>Command</dt><dd><output class="mono" id="upd-command"></output><button type="button" class="secondary small" data-copy="upd-command">Copy</button></dd></dl>
+      <p class="hint">It checks the release's signature and hash, keeps the current program, restarts Mohur, and puts the old program back if the new one does not start. <a id="upd-release" href="/" target="_blank" rel="noreferrer noopener">What changed</a></p>
+    </section>
+    <section class="card wide">
+      <dl class="record terms">
+        <dt>Running</dt><dd id="upd-running"></dd>
+        <dt>Latest</dt><dd id="upd-latest"></dd>
+        <dt>Checked</dt><dd id="upd-checked"></dd>
+      </dl>
+      <div class="status-line"><button type="button" id="upd-check">Check now</button><label class="toggle"><input type="checkbox" id="upd-daily"> Check once a day</label></div>
+      <p class="hint fine-print">A check asks GitHub for the latest release list. GitHub sees this server's address, and nothing else is sent. Without the daily check, it asks only when you press Check now.</p>
+    </section>
     <p class="notice" role="status" data-notice></p>
   </main>
 
