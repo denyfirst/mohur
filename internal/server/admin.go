@@ -360,6 +360,7 @@ type personView struct {
 	InviteExpires int64  `json:"inviteExpires,omitempty"`
 	Device        string `json:"device,omitempty"`
 	Joined        int64  `json:"joined,omitempty"`
+	App           string `json:"app,omitempty"`
 	// Partners names the connected partners this person may write with;
 	// PartnerDomains lists every partner they are chosen for, in any state.
 	Partners       []string `json:"partners"`
@@ -380,7 +381,7 @@ func (s *Server) peopleList(w http.ResponseWriter, _ *http.Request, _ string) {
 		v := personView{Username: p.Username, Address: p.Username + "@" + o.Domain, Name: p.Name, State: p.State, InviteExpires: p.InviteExpires,
 			Partners: []string{}, PartnerDomains: []string{}}
 		if p.Device != nil {
-			v.Device, v.Joined = p.Device.Label, p.Device.Joined
+			v.Device, v.Joined, v.App = p.Device.Label, p.Device.Joined, p.Device.App
 		}
 		for _, c := range conns {
 			if !c.Allows(p.Username) {

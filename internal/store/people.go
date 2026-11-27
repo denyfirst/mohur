@@ -39,6 +39,9 @@ type Device struct {
 	KyberPreKey    proto.PreKey     `json:"kyberPreKey"`
 	PreKeys        []proto.PreKey   `json:"preKeys"`
 	Joined         int64            `json:"joined"`
+	// App is the version the Mohur app on this device gave when it last
+	// signed in. It is what the app says about itself.
+	App string `json:"app,omitempty"`
 }
 
 type invite struct {
@@ -221,6 +224,22 @@ func (s *Store) ResetDevice(username string) error {
 				return err
 			}
 		}
+		return put(tx, bucketPeople, username, p)
+	})
+}
+
+// SetDeviceApp records the app version a person's current device gave, and
+// writes only when it changed.
+func (s *Store) SetDeviceApp(username string, device uint32, app string) error {
+	return s.db.Update(func(tx *bolt.Tx) error {
+		p, err := get[Person](tx, bucketPeople, username)
+		if err != nil || p.State != Active || p.Device == nil || p.Device.ID != device {
+			return ErrRefused
+		}
+		if p.Device.App == app {
+			return nil
+		}
+		p.Device.App = app
 		return put(tx, bucketPeople, username, p)
 	})
 }

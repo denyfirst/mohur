@@ -64,7 +64,7 @@ async function openEngine() {
   let extraCA;
   if (process.env.MOHUR_EXTRA_CA) extraCA = await fs.readFile(process.env.MOHUR_EXTRA_CA, 'utf8');
   const net = new Net({ resolver: process.env.MOHUR_RESOLVER || undefined, extraCA });
-  const e = new Engine(vault, net, { label: os.hostname().slice(0, 60) || 'Computer', log: (m) => console.log('[mohur]', m) });
+  const e = new Engine(vault, net, { label: os.hostname().slice(0, 60) || 'Computer', log: (m) => console.log('[mohur]', m), appVersion: app.getVersion() });
   e.on('update', () => win && !win.isDestroyed() && win.webContents.send('update'));
   return e;
 }

@@ -62,3 +62,9 @@ and only a version newer than the one running.
 The Store can take a few days to certify an app update. A server release must
 therefore keep working with the app version before it, and a release that
 needs a newer app says so in its notes.
+
+The app's version is `version` in `client/package.json`; the app gives it to
+its server when it joins and signs in. A server refuses apps older than
+`OldestApp` in `internal/server/apps.go`, and asks them to update. Raise it
+only in a server release that needs the newer app, and only once that app is
+in the Store.

@@ -40,8 +40,9 @@ export class Net {
   }
 
   // request sends one HTTPS request. body may be an object (sent as JSON) or
-  // a Buffer. The answer is parsed as JSON unless raw is set.
-  request(method, url, { body, token, raw = false, timeout = 30000, limit = 64 << 20 } = {}) {
+  // a Buffer. The answer is parsed as JSON unless raw is set. app is the app's
+  // version, given only to the person's own server when joining and signing in.
+  request(method, url, { body, token, app, raw = false, timeout = 30000, limit = 64 << 20 } = {}) {
     return new Promise((resolve, reject) => {
       const u = new URL(url);
       if (u.protocol !== 'https:') return reject(new Error('HTTPS only'));
@@ -56,6 +57,7 @@ export class Net {
       }
       if (data) headers['Content-Length'] = data.length;
       if (token) headers.Authorization = 'Bearer ' + token;
+      if (app) headers['Mohur-App'] = app;
       const req = https.request(u, { method, headers, agent: this.agent, lookup: this.lookup, timeout }, (res) => {
         const chunks = [];
         let size = 0;

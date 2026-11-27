@@ -41,12 +41,15 @@ after(() => {
   if (labProc) labProc.stdin.end();
 });
 
+// The version the app gives its server, as the packaged app does.
+const appVersion = JSON.parse(fs.readFileSync(path.join(root, 'client', 'package.json'), 'utf8')).version;
+
 const keys = {};
-async function engine(name) {
+async function engine(name, version = appVersion) {
   keys[name] ||= crypto.randomBytes(32);
   const vault = await Vault.open(path.join(tmp, name, 'vault.bin'), async () => keys[name]);
   const net = new Net({ resolver: lab.resolver, extraCA: fs.readFileSync(lab.ca, 'utf8') });
-  return new Engine(vault, net, { label: name + "'s laptop" });
+  return new Engine(vault, net, { label: name + "'s laptop", appVersion: version });
 }
 
 let aylin, kamran, fileData;
@@ -63,6 +66,23 @@ test('an invite shows the verified organization, then joins once', async () => {
   await kamran.join(lab.invites['kamran@beta.e2e.test']);
   const again = await engine('someone-else');
   await assert.rejects(again.join(lab.invites['aylin@alpha.e2e.test']), /expired or was already used/);
+});
+
+test('an app older than its server is asked to update, and keeps the invite', async () => {
+  // Leyla's invite is used for real later on; an old app must not spend it.
+  const old = await engine('leyla-old-app', '0.0.9');
+  await assert.rejects(old.join(lab.invites['leyla@beta.e2e.test']), /Update Mohur to 0\.1\.0 or newer/);
+  assert.throws(() => new Engine({ data: null }, null, { appVersion: 'v0.1.0' }), /must look like 0\.1\.0/);
+
+  // A joined app that the server finds too old says so, and recovers once
+  // it is new enough again.
+  aylin.appVersion = '0.0.9';
+  aylin.token = null;
+  await assert.rejects(aylin.api('GET', '/api/v1/contacts'), /too old for your organization's server/);
+  assert.match(aylin.snapshot().outdated, /Update Mohur to 0\.1\.0 or newer, then open it again/);
+  aylin.appVersion = appVersion;
+  await aylin.api('GET', '/api/v1/contacts');
+  assert.equal(aylin.snapshot().outdated, '');
 });
 
 test('partners appear as contacts with certified devices', async () => {

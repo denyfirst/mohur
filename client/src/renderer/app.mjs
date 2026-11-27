@@ -77,8 +77,13 @@ async function refresh() {
   $('me-org').textContent = snap.me.org;
   $('me-org').title = snap.me.address;
   avatar($('me-avatar'), snap.me);
-  $('status').toggleAttribute('data-online', snap.online);
-  $('status-text').textContent = snap.online ? 'Connected' : 'Connecting…';
+  // The server asks an app too old for it to update; until then it says so.
+  const outdated = Boolean(snap.outdated);
+  $('status').toggleAttribute('data-online', snap.online && !outdated);
+  $('status').toggleAttribute('data-outdated', outdated);
+  $('status-text').textContent = outdated ? 'Update needed' : snap.online ? 'Connected' : 'Connecting…';
+  $('update-bar').hidden = !outdated;
+  $('update-text').textContent = snap.outdated || '';
   const unread = snap.people.reduce((n, p) => n + (p.unread || 0), 0);
   document.title = unread ? `(${unread}) Mohur` : 'Mohur';
   drawPeople();

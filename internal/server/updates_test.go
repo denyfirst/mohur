@@ -57,6 +57,7 @@ type updateAnswer struct {
 	Error     string `json:"error"`
 	Available bool   `json:"available"`
 	Release   string `json:"release"`
+	OldestApp string `json:"oldestApp"`
 	Command   string `json:"command"`
 }
 

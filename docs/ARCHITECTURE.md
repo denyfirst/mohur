@@ -192,6 +192,16 @@ place, restarts every running `mohurd` unit, and puts the previous binary
 back if one does not come up. The desktop app is updated by the Microsoft
 Store and has no update code.
 
+The app gives its version, such as `0.1.0`, in a `Mohur-App` header when it
+joins and each time it signs in, and only to its own server. The server
+records it with the device once the device has proved its key, shows it to
+admins on the People page, and never puts it in what colleagues or partners
+receive. A server works with apps from `OldestApp` on
+(`internal/server/apps.go`); an older app, or one that gives no version, is
+answered `426` with a request to update, which the app shows until it is new
+enough. The version is what the app says about itself: it decides whom to ask
+to update, never whom to trust.
+
 ## Admin access
 
 An admin signs in with a password (Argon2id) and an authenticator code, or a

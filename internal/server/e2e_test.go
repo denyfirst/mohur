@@ -198,6 +198,8 @@ type device struct {
 	token   string
 	http    *http.Client
 	cert    proto.DeviceCert
+	// app is the version this device gives when it joins and signs in.
+	app string
 }
 
 func randomB64(n int, first byte) string {
@@ -217,14 +219,24 @@ func (o *org) invite(username, name string) string {
 	return res.Invite
 }
 
+// testApp is the app version synthetic devices give unless a test says otherwise.
+const testApp = OldestApp
+
 func (o *org) join(invite string, want int) *device {
+	o.lab.t.Helper()
+	return o.joinAs(invite, testApp, want)
+}
+
+// joinAs joins with an app that gives version app ("" gives none).
+func (o *org) joinAs(invite, app string, want int) *device {
 	t := o.lab.t
+	t.Helper()
 	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
 	in := map[string]any{"invite": invite, "label": "Test laptop", "identityKey": randomB64(33, 5), "authKey": proto.B64(pub), "registrationId": 1234,
 		"signedPreKey": map[string]any{"id": 1, "pub": randomB64(33, 5), "sig": randomB64(64, 0)},
 		"kyberPreKey":  map[string]any{"id": 1, "pub": randomB64(1569, 8), "sig": randomB64(64, 0)},
 		"preKeys":      []map[string]any{{"id": 1, "pub": randomB64(33, 5)}, {"id": 2, "pub": randomB64(33, 5)}}}
-	d := &device{org: o, auth: priv, http: o.lab.client(nil)}
+	d := &device{org: o, auth: priv, http: o.lab.client(nil), app: app}
 	var res struct {
 		Cert proto.DeviceCert `json:"cert"`
 	}
@@ -266,6 +278,9 @@ func (d *device) call(method, path string, in, out any, want int) {
 	}
 	if d.token != "" {
 		req.Header.Set("Authorization", "Bearer "+d.token)
+	}
+	if d.app != "" {
+		req.Header.Set(AppHeader, d.app)
 	}
 	resp, err := d.http.Do(req)
 	if err != nil {
