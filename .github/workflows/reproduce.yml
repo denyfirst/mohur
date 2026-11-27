@@ -1,0 +1,73 @@
+name: Reproduce
+
+# Rebuilds each published release from its tag and checks it in public: that
+# denyfirst's release key signed SHA256SUMS, that the release holds exactly
+# the files on that list with those hashes, and that the list is byte for byte
+# what the tag builds. Releases are built and signed on the maintainer's
+# machine, and GitHub holds no signing key; this shows anyone the two agree.
+#
+# The build is the tag's own scripts/release-build.ps1, the same command the
+# maintainer runs, so a mismatch means different bytes, not a different
+# procedure. CI builds with it on Linux and Windows on every change.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to check, such as v0.1.0
+        required: true
+
+permissions: {}
+
+jobs:
+  reproduce:
+    name: Rebuild and compare the release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - name: Check out the tagged source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          if [[ ! "${TAG}" =~ ^v[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}$ ]]; then
+            echo "Not a release tag: ${TAG}" >&2
+            exit 1
+          fi
+          git init -q
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          auth="$(printf 'x-access-token:%s' "${GH_TOKEN}" | base64 -w0)"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${auth}" \
+            fetch -q --depth 1 origin "+refs/tags/${TAG}:refs/tags/${TAG}" "+refs/heads/main:refs/remotes/origin/main"
+          unset auth
+          git checkout -q "refs/tags/${TAG}"
+          echo "${TAG} is commit $(git rev-parse HEAD)"
+
+      - name: Download the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          mkdir "${RUNNER_TEMP}/release"
+          gh release download "${TAG}" --repo "${GITHUB_REPOSITORY}" --dir "${RUNNER_TEMP}/release"
+          ls -l "${RUNNER_TEMP}/release"
+
+      - name: Build the tag
+        shell: pwsh
+        run: ./scripts/release-build.ps1 -Version $env:TAG
+
+      - name: Check the release against the build
+        run: |
+          set -eu
+          # With the tag's .allowed_signers, the key its mohurd carries
+          # compiled in, and with main's, which INSTALL.md tells people to use.
+          sh scripts/release-verify.sh "${RUNNER_TEMP}/release" ".work/release/${TAG}"
+          git show origin/main:.allowed_signers > "${RUNNER_TEMP}/main.allowed_signers"
+          sh scripts/release-verify.sh "${RUNNER_TEMP}/release" ".work/release/${TAG}" "${RUNNER_TEMP}/main.allowed_signers"

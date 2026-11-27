@@ -24,7 +24,9 @@ Mohur runs on a Linux x86-64 server with systemd, such as Ubuntu 24.04.
   mv mohurd_*_linux_amd64 mohurd
   ```
 
-  Or build it yourself; [RELEASING.md](RELEASING.md) builds the same bytes.
+  Or build it yourself: `scripts/release-build.ps1` builds the same bytes
+  from the release's tag (see [RELEASING.md](RELEASING.md)). A public
+  workflow, Reproduce, rebuilds every release that way and checks it.
 
 ## Install
 
