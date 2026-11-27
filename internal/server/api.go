@@ -94,8 +94,8 @@ func (s *Server) join(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, "Refused. Wait a minute and try again.")
 		return
 	}
-	app, appOK := s.appVersion(w, r)
-	if !appOK {
+	// Joining only checks the version; the sign-in that follows records it.
+	if _, appOK := s.appVersion(w, r); !appOK {
 		return
 	}
 	o, key, ok := s.org()
@@ -119,7 +119,7 @@ func (s *Server) join(w http.ResponseWriter, r *http.Request) {
 	}
 	s.changed()
 	s.tellPartners("")
-	s.log.Info("device joined", "person", p.Username, "device", p.Device.ID, "app", app)
+	s.log.Info("device joined", "person", p.Username, "device", p.Device.ID)
 	writeJSON(w, http.StatusOK, map[string]any{"cert": p.Device.Cert})
 }
 
