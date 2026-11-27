@@ -179,6 +179,16 @@ denyfirst signs each release's `SHA256SUMS` with its release key, as
 into `mohurd`. `internal/sshsig` reads the signature format strictly and
 verifies with `crypto/ed25519`.
 
+`scripts/release-build.ps1` builds a release and sets every Go setting that
+can change the bytes itself: the Go that `go.mod` names, no cgo, no paths, no
+build id, and none of the machine's own Go settings. A build of the tag on any
+machine therefore gives the same files. CI builds a release on Linux and on
+Windows on every change and requires the same bytes. When a release is
+published, the Reproduce workflow builds its tag and runs
+`scripts/release-verify.sh`, which checks denyfirst's signature, that the
+release holds exactly the listed files, and that they are the bytes the tag
+builds.
+
 The admin's Server page shows the running version. The server asks GitHub for
 the latest release list only when an admin presses **Check now**, or once a
 day, at a random hour, after an admin turns that on; it is off by default. A
