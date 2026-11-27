@@ -94,6 +94,10 @@ func (s *Server) join(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, "Refused. Wait a minute and try again.")
 		return
 	}
+	app, appOK := s.appVersion(w, r)
+	if !appOK {
+		return
+	}
 	o, key, ok := s.org()
 	if !ok {
 		fail(w, http.StatusConflict, "This server is not set up yet.")
@@ -115,7 +119,7 @@ func (s *Server) join(w http.ResponseWriter, r *http.Request) {
 	}
 	s.changed()
 	s.tellPartners("")
-	s.log.Info("device joined", "person", p.Username, "device", p.Device.ID)
+	s.log.Info("device joined", "person", p.Username, "device", p.Device.ID, "app", app)
 	writeJSON(w, http.StatusOK, map[string]any{"cert": p.Device.Cert})
 }
 
@@ -152,6 +156,10 @@ func (s *Server) sessionCreate(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, "Refused.")
 		return
 	}
+	app, appOK := s.appVersion(w, r)
+	if !appOK {
+		return
+	}
 	s.mu.Lock()
 	n, ok := s.nonces[in.Nonce]
 	delete(s.nonces, in.Nonce)
@@ -169,6 +177,11 @@ func (s *Server) sessionCreate(w http.ResponseWriter, r *http.Request) {
 	auth, err := proto.PublicKey(p.Device.Cert.AuthKey)
 	if err != nil || !proto.Verify(auth, in.Sig, proto.ContextSession, domain, in.Address, strconv.FormatUint(uint64(in.Device), 10), in.Nonce) {
 		fail(w, http.StatusUnauthorized, "Refused.")
+		return
+	}
+	// Only a signed-in device records its version, and only when it changed.
+	if p.Device.App != app && s.st.SetDeviceApp(user, in.Device, app) != nil {
+		fail(w, http.StatusUnauthorized, "This device is no longer part of the organization.")
 		return
 	}
 	token, h := randomToken()

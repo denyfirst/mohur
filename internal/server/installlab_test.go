@@ -50,6 +50,7 @@ func TestInstalledServer(t *testing.T) {
 		}
 		req, _ := http.NewRequest(method, base+path, body)
 		req.Header.Set("X-Mohur", "1")
+		req.Header.Set(AppHeader, OldestApp)
 		if in != nil {
 			req.Header.Set("Content-Type", "application/json")
 		}
@@ -100,6 +101,14 @@ func TestInstalledServer(t *testing.T) {
 	call("POST", "/api/v1/session/challenge", map[string]any{"address": joined.Cert.Address, "device": joined.Cert.Device}, 200, &ch)
 	sig := proto.Sign(priv, proto.ContextSession, "ci.test", joined.Cert.Address, strconv.Itoa(int(joined.Cert.Device)), ch.Nonce)
 	call("POST", "/api/v1/session", map[string]any{"address": joined.Cert.Address, "device": joined.Cert.Device, "nonce": ch.Nonce, "sig": sig}, 200, nil)
+	var people []struct {
+		Username string `json:"username"`
+		App      string `json:"app"`
+	}
+	call("GET", "/admin/api/people", nil, 200, &people)
+	if len(people) != 1 || people[0].App != OldestApp {
+		t.Fatalf("the People page does not show the app version: %+v", people)
+	}
 
 	// The operator's code from `sudo mohurd reset-admin` works on the
 	// sandboxed service, which kept running, and only once.

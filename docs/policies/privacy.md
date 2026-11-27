@@ -1,6 +1,6 @@
 # Mohur privacy
 
-Last changed 26 November 2026.
+Last changed 27 November 2026.
 
 Mohur lets people at organizations that each run their own server write to each other, end to end encrypted. It is two programs: the Mohur app for Windows, and the Mohur server, `mohurd`, which each organization runs for itself. denyfirst writes both and publishes them as free software under the AGPL-3.0. denyfirst runs no Mohur server for you.
 
@@ -68,13 +68,13 @@ The server asks GitHub for the latest release list only when an admin presses Ch
 
 ## What the app sends
 
-- **To your organization's server, when you join:** the invite code, this computer's name (your admin sees it as the device name) and your public keys.
-- **To your organization's server, after that:** encrypted messages, files and delivery receipts, requests for your contacts and their public keys, and the reports you choose to send.
+- **To your organization's server, when you join:** the invite code, this computer's name (your admin sees it as the device name), your public keys and the app's version number.
+- **To your organization's server, after that:** encrypted messages, files and delivery receipts, requests for your contacts and their public keys, the reports you choose to send, and the app's version number each time it signs in.
 - **To the DNS servers your computer uses:** the names it looks up, which are your organization's and your partners' domains.
 
 ## What your organization's server keeps
 
-- About you: your user name and display name, which your admin gives you, when you joined, the device name, your public keys and your device's certificate.
+- About you: your user name and display name, which your admin gives you, when you joined, the device name, the version of the Mohur app on it, your public keys and your device's certificate.
 - Encrypted messages and files waiting for you, with their sender, recipient, time and size.
 - The reports you send.
 - The partners your admin connected, and those of their people you may write to.
@@ -87,12 +87,12 @@ Your admin can reset your device, so that you, or someone else, can join again a
 
 ## Updates
 
-- The Microsoft Store updates the app; see below.
+- The Microsoft Store updates the app; see below. If your organization's server needs a newer app than yours, the app says so and asks you to update it.
 - The server looks for a newer release only as the promise above says. GitHub sees the server's address when it asks, and again when `mohurd upgrade` downloads a release.
 
 ## What a partner's server receives
 
-Only if your admin lets you write with that partner: your address, your display name, your device's public keys and certificate, and the encrypted messages and files you send to their people, with sender, recipient, time and size. A partner never hears of your reports or whom you block. What a partner's server keeps is up to that organization.
+Only if your admin lets you write with that partner: your address, your display name, your device's public keys and certificate, and the encrypted messages and files you send to their people, with sender, recipient, time and size. A partner never hears of your reports, whom you block or which version of the app you use. What a partner's server keeps is up to that organization.
 
 ## Microsoft Store
 

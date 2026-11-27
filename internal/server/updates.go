@@ -16,10 +16,12 @@ type updateView struct {
 	Available bool   `json:"available"`
 	Release   string `json:"release,omitempty"` // the latest release's page
 	Command   string `json:"command"`
+	// OldestApp is the oldest desktop app that may join and sign in here.
+	OldestApp string `json:"oldestApp"`
 }
 
 func (s *Server) updateView(st updates.State) updateView {
-	v := updateView{State: st, Available: s.updates != nil, Command: "sudo mohurd upgrade"}
+	v := updateView{State: st, Available: s.updates != nil, Command: "sudo mohurd upgrade", OldestApp: s.oldestApp()}
 	if st.Latest != "" {
 		v.Release = updates.Releases + "tag/" + st.Latest
 	}

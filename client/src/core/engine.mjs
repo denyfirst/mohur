@@ -14,6 +14,9 @@ const MAX_FILE = 100 * 1024 * 1024;
 const FILE_AAD = Buffer.from('mohur/file/v1');
 // The reasons a person can give their admin, as the server knows them.
 const REPORT_REASONS = ['spam', 'abuse', 'illegal', 'other'];
+// The app gives its version to its own server, which asks an app too old for
+// it to update. Nothing else learns it.
+const APP_VERSION = /^(0|[1-9]\d{0,3})\.(0|[1-9]\d{0,3})\.(0|[1-9]\d{0,3})$/;
 
 // Plaintexts are padded to 160-byte steps (ISO/IEC 7816-4), so a message's
 // length shows only roughly how long it is.
@@ -121,8 +124,12 @@ class KyberStore extends Signal.KyberPreKeyStore {
 // ── The engine ────────────────────────────────────────────────────────────
 
 export class Engine extends EventEmitter {
-  constructor(vault, net, { label = 'Computer', log = () => {} } = {}) {
+  constructor(vault, net, { label = 'Computer', log = () => {}, appVersion } = {}) {
     super();
+    if (appVersion !== undefined && !APP_VERSION.test(appVersion)) throw new Error('The app version must look like 0.1.0.');
+    this.appVersion = appVersion;
+    // outdated is the server's request to update, while it refuses this app.
+    this.outdated = '';
     this.vault = vault;
     this.net = net;
     this.label = label;
@@ -233,6 +240,7 @@ export class Engine extends EventEmitter {
         registrationId, signedPreKey: { id: 1, pub: b64(signedPriv.getPublicKey().serialize()), sig: b64(signedSig) },
         kyberPreKey: { id: 1, pub: b64(kem.getPublicKey().serialize()), sig: b64(kemSig) }, preKeys,
       },
+      app: this.appVersion,
     });
     const cert = res.cert;
     if (!checkCert(cert, doc.key, domain) || cert.identityKey !== b64(identity.getPublicKey().serialize()) || cert.authKey !== b64(authRaw)) {
@@ -269,8 +277,21 @@ export class Engine extends EventEmitter {
     const ch = await this.net.request('POST', this.url('/api/v1/session/challenge'), { body: { address: me.address, device: me.device } });
     const key = crypto.createPrivateKey({ key: unb64(me.auth), format: 'der', type: 'pkcs8' });
     const sig = sign(key, ContextSession, me.domain, me.address, String(me.device), ch.nonce);
-    const res = await this.net.request('POST', this.url('/api/v1/session'), { body: { address: me.address, device: me.device, nonce: ch.nonce, sig } });
+    let res;
+    try {
+      res = await this.net.request('POST', this.url('/api/v1/session'), { body: { address: me.address, device: me.device, nonce: ch.nonce, sig }, app: this.appVersion });
+    } catch (e) {
+      if (e instanceof HttpError && e.status === 426 && this.outdated !== e.message) {
+        this.outdated = e.message;
+        this.changed();
+      }
+      throw e;
+    }
     this.token = res.token;
+    if (this.outdated) {
+      this.outdated = '';
+      this.changed();
+    }
   }
 
   async api(method, path, opts = {}) {
@@ -690,7 +711,8 @@ export class Engine extends EventEmitter {
         } catch (e) {
           if (this.online) { this.online = false; this.changed(); }
           this.log('connection problem: ' + e.message);
-          await new Promise((r) => setTimeout(r, 5000));
+          // An app the server is too old for asks again only now and then.
+          await new Promise((r) => setTimeout(r, this.outdated ? 60000 : 5000));
         }
       }
     };
@@ -720,7 +742,7 @@ export class Engine extends EventEmitter {
         file: m.file ? { name: m.file.name, size: m.file.size, type: m.file.type } : undefined }));
     }
     return {
-      joined: true, online: Boolean(this.online),
+      joined: true, online: Boolean(this.online), outdated: this.outdated,
       me: { address: this.me.address, name: this.me.name, org: this.me.orgName, domain: this.me.domain },
       people, convs,
       partners: Object.entries(d.orgs).filter(([k]) => k !== this.me.domain).map(([domain, o]) => ({ domain, name: o.name, blocked: Boolean(o.blocked) })),

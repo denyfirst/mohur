@@ -137,6 +137,7 @@ function drawServer(u) {
   $('upd-running').textContent = u.running && u.running !== 'dev' ? u.running : 'A development build';
   $('upd-latest').replaceChildren(u.latest ? u.latest : el('span', { class: 'sub' }, u.available ? 'Not checked yet' : 'Update checks are not set up on this server'));
   $('upd-checked').textContent = u.checkedAt ? when(u.checkedAt) : '—';
+  $('upd-apps').textContent = `Mohur ${u.oldestApp} or newer can sign in`;
   $('upd-check').disabled = !u.available;
   $('upd-daily').disabled = !u.available;
   $('upd-daily').checked = Boolean(u.daily);
@@ -226,9 +227,17 @@ const partnerItems = (choices) => choices.map((c) => [c.domain, c.name, choiceWo
 
 let partnerChoices = [];
 
+// appOlder reports whether app version a (such as 0.1.0) comes before b.
+function appOlder(a, b) {
+  const x = a.split('.').map(Number);
+  const y = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] < y[i];
+  return false;
+}
+
 async function people() {
   $('people-title').textContent = 'People in ' + state.org.name;
-  const [list, choices] = await Promise.all([api('people'), api('partners/choices')]);
+  const [list, choices, upd] = await Promise.all([api('people'), api('partners/choices'), api('updates')]);
   partnerChoices = choices;
   const ul = $('people-list');
   ul.replaceChildren();
@@ -237,7 +246,9 @@ async function people() {
     const initials = p.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
     const side = el('div', { class: 'row-side' });
     if (p.state === 'active') {
-      side.append(pill('Joined', 'good'));
+      // An app older than this server allows was last seen before an upgrade.
+      if (p.app && appOlder(p.app, upd.oldestApp)) side.append(pill('App out of date', 'warn'));
+      else side.append(pill('Joined', 'good'));
       side.append(el('button', { type: 'button', class: 'secondary small', onclick: () => resetDevice(p) }, 'New device'));
     } else {
       const expired = p.inviteExpires && p.inviteExpires * 1000 < Date.now();
@@ -245,7 +256,8 @@ async function people() {
       side.append(el('button', { type: 'button', class: 'secondary small', onclick: () => openInvite(p) }, 'New invite'));
     }
     side.append(el('button', { type: 'button', class: 'secondary small', onclick: () => removePerson(p) }, 'Remove'));
-    const sub = p.state === 'active' ? `${p.address} · ${p.device} · joined ${when(p.joined)}` : `${p.address} · invite works until ${when(p.inviteExpires)}`;
+    const app = p.app ? ` · Mohur ${p.app}` : '';
+    const sub = p.state === 'active' ? `${p.address} · ${p.device}${app} · joined ${when(p.joined)}` : `${p.address} · invite works until ${when(p.inviteExpires)}`;
     const writes = el('span', { class: 'access-line' }, writesWith(p));
     if (choices.length) writes.append(el('button', { type: 'button', class: 'link-button', onclick: () => openPerson(p) }, 'Change partners'));
     ul.append(el('li', { class: 'row' }, el('span', { class: 'avatar', 'aria-hidden': 'true' }, initials),

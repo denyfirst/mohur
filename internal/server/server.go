@@ -31,6 +31,7 @@ type Server struct {
 	disc    *discover.Verifier
 	log     *slog.Logger
 	clock   atomic.Pointer[func() time.Time]
+	oldest  atomic.Pointer[string]
 	updates *updates.Service
 
 	mu        sync.Mutex
@@ -74,6 +75,7 @@ func New(st *store.Store, disc *discover.Verifier, log *slog.Logger) *Server {
 		setupSeed: map[[32]byte]string{}, waiters: map[string][]chan struct{}{},
 		limits: map[string]*window{}, nonces: map[string]clientNonce{}, directory: time.Now().Unix()}
 	s.SetClock(time.Now)
+	s.setOldestApp(OldestApp)
 	return s
 }
 
