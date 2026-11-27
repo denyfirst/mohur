@@ -202,6 +202,28 @@ answered `426` with a request to update, which the app shows until it is new
 enough. The version is what the app says about itself: it decides whom to ask
 to update, never whom to trust.
 
+## The server's certificate
+
+Partners and apps reach a server only over TLS with a certificate that
+browsers trust, for its own name. Unless the operator gives a certificate of
+their own, `mohurd` gets one from Let's Encrypt (`internal/autotls`, over
+`golang.org/x/crypto/acme/autocert`). Let's Encrypt checks the name by
+connecting to it on port 443 with TLS-ALPN-01, which `mohurd` answers itself,
+so nothing listens on port 80. A certificate is asked only for the name given
+at install, never for one a client sends. The request is made as the server
+starts, and its outcome is logged in plain words: ready, with its end date, or
+why not, such as a name that does not point at the server or a closed port.
+Renewal starts 30 days before the end; `mohurd` checks daily and warns when
+20 days are left. Let's Encrypt is reached only at public addresses on port
+443, without redirects or a proxy. It learns the server's name, which is in
+the public certificate logs in any case, and the server's address; no e-mail
+address is given. Getting a certificate accepts the Let's Encrypt Subscriber
+Agreement, and `install.sh` says so before it starts the server.
+
+The account key and each certificate with its private key are kept in the
+database, sealed with the instance key under their own names, like the
+organization key.
+
 ## Admin access
 
 An admin signs in with a password (Argon2id) and an authenticator code, or a
@@ -221,8 +243,9 @@ device ids so that more devices can come later without a new protocol.
 
 ## Storage
 
-- `mohurd` keeps one bbolt file. The organization key and the TOTP seeds are
-  sealed with an instance key that lives in a separate root-only file.
+- `mohurd` keeps one bbolt file. The organization key, the TOTP seeds and the
+  Let's Encrypt account key and certificates are sealed with an instance key
+  that lives in a separate root-only file.
 - The app keeps one encrypted vault per profile. Its key is protected with the
   operating system's user store (DPAPI on Windows, Keychain on macOS, libsecret
   on Linux) through Electron `safeStorage`. Writes go to a temporary file and

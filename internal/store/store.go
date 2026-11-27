@@ -95,7 +95,7 @@ func Open(dir, keyFile string) (*Store, error) {
 		return nil, err
 	}
 	err = db.Update(func(tx *bolt.Tx) error {
-		for _, b := range [][]byte{bucketMeta, bucketAdmins, bucketPeople, bucketInvites, bucketConnections, bucketQueue, bucketBlobs, bucketNonces, bucketDirectory, bucketReports} {
+		for _, b := range [][]byte{bucketMeta, bucketAdmins, bucketPeople, bucketInvites, bucketConnections, bucketQueue, bucketBlobs, bucketNonces, bucketDirectory, bucketReports, bucketACME} {
 			if _, err := tx.CreateBucketIfNotExists(b); err != nil {
 				return err
 			}

@@ -544,7 +544,11 @@ function wire() {
   });
   $('setup-domain').addEventListener('input', () => {
     const d = $('setup-domain').value.trim().toLowerCase();
-    if (!$('setup-server').dataset.touched) $('setup-server').value = d ? 'mohur.' + d : '';
+    // The name this page was opened at is the server's, when it is under the
+    // domain: its certificate is for that name.
+    const here = location.hostname;
+    const server = here === d || here.endsWith('.' + d) ? location.host : 'mohur.' + d;
+    if (!$('setup-server').dataset.touched) $('setup-server').value = d ? server : '';
   });
   $('setup-server').addEventListener('input', () => { $('setup-server').dataset.touched = '1'; });
   $('setup-form').addEventListener('submit', async (ev) => {
